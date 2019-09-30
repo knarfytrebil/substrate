@@ -39,6 +39,7 @@ tel = { package = "substrate-telemetry", path = "../../core/telemetry" }
 offchain = { package = "substrate-offchain", path = "../../core/offchain" }
 parity-multiaddr = { package = "parity-multiaddr", version = "0.5.0" }
 authority-discovery-primitives = { package = "substrate-authority-discovery-primitives", path = "../authority-discovery/primitives", default-features = false }
+ln-bridge = { package = "ln-bridge", path = "../../core/ln-bridge" }
 
 [dev-dependencies]
 substrate-test-runtime-client = { path = "../test-runtime/client" }
