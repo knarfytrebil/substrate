@@ -423,10 +423,12 @@ macro_rules! new_impl {
 				.then(|_| Ok(()))));
 			telemetry
 		});
+
     // lightning bridge
     let ln_bridge = ln_bridge::LnBridge::new(exit.clone());
     let ln_bridge = Arc::new(ln_bridge);
-
+    let ln_tasks = ln_bridge.bind_client(client.clone());
+    to_spawn_tx.unbounded_send(ln_tasks);
 
 		Ok(NewService {
 			client,
