@@ -1,6 +1,7 @@
 [package]
 name = "ln-bridge"
 version = "2.0.0"
+edition = "2018"
 
 [dependencies]
 # ln-primitives = { path = "./primitives" }
@@ -8,6 +9,7 @@ version = "2.0.0"
 client = { package = "substrate-client", path = "../../core/client" }
 # substrate-service = { path = "../../core/service" }
 ln-manager = { git = "https://github.com/YaaMe/rust-lightning-bitcoinrpc.git", branch = "knarfytrebil" }
+# ln-manager = { path = "../../../pylon/rust-lightning-bitcoinrpc/ln-manager" }
 futures01 = "0.1.17"
 futures = { package = "futures-preview", version = "0.3.0-alpha.18" }
 tokio = { version = "=0.2.0-alpha.4" }

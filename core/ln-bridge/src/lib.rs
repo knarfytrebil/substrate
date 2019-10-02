@@ -70,8 +70,7 @@ impl Larva for Drone {
 pub struct LnBridge {
   ln_manager: Arc<LnManager<Drone>>,
   exit: Exit,
-  sender: mpsc::UnboundedSender<u32>,
-  receiver: mpsc::UnboundedReceiver<u32>,
+  runtime: tokio::runtime::Runtime,
 }
 
 impl LnBridge {
@@ -82,42 +81,31 @@ impl LnBridge {
     let drone = Drone::new(executor);
     let ln_manager = runtime.block_on(LnManager::new(settings, drone)).unwrap();
     let ln_manager = Arc::new(ln_manager);
-    let addr = "03bd08935ad23d0439e8ac9a6b87fff354b6cb4bed51c663471c994e1ab61adbb6@127.0.0.1:19011";
-    ln_manager.connect(addr.to_string());
-    let (sender, receiver) = mpsc::unbounded::<u32>();
+
     Self {
       ln_manager,
       exit,
-      sender,
-      receiver,
+      runtime,
     }
   }
   pub fn ln_manager(&self) -> Arc<LnManager<Drone>> {
     self.ln_manager.clone()
   }
+  pub fn executor(&self) -> tokio::runtime::TaskExecutor {
+    self.runtime.executor()
+  }
 
   pub fn bind_client<B, C>(&self, client: Arc<C>) -> Task
     where B: BlockT, C: BlockchainEvents<B> + HeaderBackend<B> + 'static {
-    println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>connect client");
-    // let ln = client.import_notification_stream()
-    //   .for_each(move |notification| {
-    //     Ok(())
-    //   });
-    let ln_manager = self.ln_manager();
     let cli = client.clone();
-    let sender = self.sender.clone();
-    let num = 3;
+    let ln_manager = self.ln_manager();
     let ln = client.import_notification_stream()
       .map(|v| Ok::<_, ()>(v)).compat()
       .for_each(move |notification| {
         let number = cli.info().best_number;
-        if (number == num.into()) {
-          // sender.unbounded_send(1);
-          // let addr = "03bd08935ad23d0439e8ac9a6b87fff354b6cb4bed51c663471c994e1ab61adbb6@127.0.0.1:19011";
-          // let addr = "02ea3e4997fdc1b63174b4f6ccffd34f80ef4f183b4e9253655b2d79c969d5def5@127.0.0.1:19001";
-          // ln_manager.connect(addr.to_string());
-        }
-        println!(">>>>>>>>>>>{}", ln_manager.list().len());
+        // let addr = "03bd08935ad23d0439e8ac9a6b87fff354b6cb4bed51c663471c994e1ab61adbb6@127.0.0.1:19011";
+        // // let addr = "02ea3e4997fdc1b63174b4f6ccffd34f80ef4f183b4e9253655b2d79c969d5def5@127.0.0.1:19001";
+        // ln_manager.connect(addr.to_string());
         Ok(())
       }).select(self.exit.clone()).then(|_| Ok(()));
     Box::new(ln)
