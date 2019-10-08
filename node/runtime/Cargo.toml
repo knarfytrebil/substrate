@@ -24,6 +24,7 @@ sr-staking-primitives = { path = "../../core/sr-staking-primitives", default-fea
 substrate-keyring = { path = "../../core/keyring", optional = true }
 substrate-session = { path = "../../core/session", default-features = false }
 version = { package = "sr-version", path = "../../core/sr-version", default-features = false }
+ln-primitives = { path = "../../core/ln-bridge/primitives", default-features = false }
 
 authority-discovery = { package = "srml-authority-discovery", path = "../../srml/authority-discovery", default-features = false }
 authorship = { package = "srml-authorship", path = "../../srml/authorship", default-features = false }
@@ -53,6 +54,7 @@ timestamp = { package = "srml-timestamp", path = "../../srml/timestamp", default
 treasury = { package = "srml-treasury", path = "../../srml/treasury", default-features = false }
 utility = { package = "srml-utility", path = "../../srml/utility", default-features = false }
 transaction-payment = { package = "srml-transaction-payment", path = "../../srml/transaction-payment", default-features = false }
+lightning = { package = "srml-lightning", path = "../../srml/lightning", default-features = false }
 
 [build-dependencies]
 wasm-builder-runner = { package = "substrate-wasm-builder-runner", version = "1.0.2", path = "../../core/utils/wasm-builder-runner" }
@@ -103,4 +105,5 @@ std = [
 	"utility/std",
 	"transaction-payment/std",
 	"version/std",
+  "lightning/std",
 ]

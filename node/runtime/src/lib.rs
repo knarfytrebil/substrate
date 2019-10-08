@@ -498,6 +498,9 @@ impl system::offchain::CreateTransaction<Runtime, UncheckedExtrinsic> for Runtim
 	}
 }
 
+impl lightning::Trait for Runtime {
+}
+
 construct_runtime!(
 	pub enum Runtime where
 		Block = Block,
@@ -528,6 +531,7 @@ construct_runtime!(
 		AuthorityDiscovery: authority_discovery::{Module, Call, Config<T>},
 		Offences: offences::{Module, Call, Storage, Event},
 		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
+    Lightning: lightning::{Module, Call, Storage},
 	}
 );
 
@@ -707,6 +711,11 @@ impl_runtime_apis! {
 			SessionKeys::generate(seed)
 		}
 	}
+
+  impl ln_primitives::LnApi<Block> for Runtime {
+    fn link_bridge() {
+    }
+  }
 }
 
 #[cfg(test)]
