@@ -7,7 +7,7 @@ use system::{ensure_none, ensure_signed};
 use sr_primitives::{generic::DigestItem};
 use ln_primitives::{
   LN_ENGINE_ID, ConsensusLog,
-  Account, Tx,
+  Account, Tx, LnNode,
 };
 
 pub trait Trait: system::Trait {
@@ -29,9 +29,9 @@ decl_module! {
     fn request_deposit(origin, amount: u64) {
     }
     fn request_atomic_swap_deposit(origin, amount: u64) {
-      let account_id = ensure_signed(origin)?;
-      let account = Account { id: 1, wallet_id: 1 };
-      let tx = Tx { amount };
+      // let account_id = ensure_signed(origin)?;
+      // let account = Account { id: 1, wallet_id: 1 };
+      // let tx = Tx { amount };
       // let log = ConsensusLog::DepositReq(account, tx);
       // let log = ConsensusLog::ConnectPeer();
       // let log: DigestItem<T::Hash> = DigestItem::Consensus(LN_ENGINE_ID, log.encode());
@@ -40,10 +40,10 @@ decl_module! {
     fn request_atomic_swap_deposit_with_x(origin, amount: u64) {
     }
     fn connect_peer(origin, node_key: Vec<u8>) {
-      let account_id = ensure_signed(origin)?;
-      // let log = ConsensusLog::ConnectPeer(node_key);
-      // let log: DigestItem<T::Hash> = DigestItem::Consensus(LN_ENGINE_ID, log.encode());
-      // <system::Module<T>>::deposit_log(log.into());
+      // let account_id = ensure_signed(origin)?;
+      let log = ConsensusLog::ConnectPeer(LnNode {node_key});
+      let log: DigestItem<T::Hash> = DigestItem::Consensus(LN_ENGINE_ID, log.encode());
+      <system::Module<T>>::deposit_log(log.into());
     }
   }
 }

@@ -6,6 +6,7 @@ extern crate sr_primitives;
 // extern crate substrate_service;
 extern crate ln_manager;
 extern crate client;
+extern crate hex;
 
 mod ln_event;
 
@@ -26,7 +27,6 @@ use futures01::future::Future as Future01;
 use futures01::Stream;
 use futures::{StreamExt, TryStreamExt};
 // use futures::stream::Stream;
-
 
 use ln_manager::ln_bridge::settings::Settings;
 use ln_manager::executor::Larva;
@@ -55,7 +55,7 @@ use sr_primitives::traits::{self, ProvideRuntimeApi, NumberFor};
 use sr_primitives::generic::{BlockId, OpaqueDigestItemId};
 
 // use sr_primitives::generic::BlockId;
-pub use ln_primitives::{LnApi, ConsensusLog, LN_ENGINE_ID};
+pub use ln_primitives::{LnApi, ConsensusLog, LN_ENGINE_ID, LnNode};
 
 pub type Executor = tokio::runtime::TaskExecutor;
 pub type Task = Box<dyn Future01<Item = (), Error = ()> + Send>;
@@ -146,7 +146,16 @@ impl LnBridge {
             // ConsensusLog::ForceCloseAllChannel() => Some(1),
             // ConsensusLog::PayInvoice() => Some(1),
             // ConsensusLog::CreateInvoice() => Some(1),
-            ConsensusLog::ConnectPeer(node) => Some(String::from("1")),
+            ConsensusLog::ConnectPeer(node) => {
+              // let node = ConsensusLog::decode(node);
+              // let node = Decode::decode(&mut node);
+              let k = node.node_key;
+              let hex_str = hex::encode(k);
+              let bytes = hex::decode(hex_str).unwrap();
+              let addr = String::from_utf8(bytes).unwrap();
+              println!("<<<<<<<<<<<<<<<<<<<<<<<<<< addr {:?}", addr);
+              Some(ln_manager.connect(addr))
+            },
             _ => None,
           };
           header.digest().convert_first(|l| l.try_to(id).and_then(filter_log))

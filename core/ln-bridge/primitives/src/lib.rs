@@ -42,7 +42,8 @@ pub enum ConsensusLog {
   #[codec(index = "5")]
   CreateInvoice(Vec<u8>),// line: String
   #[codec(index = "6")]
-  ConnectPeer(Vec<u8>),// node: String
+  ConnectPeer(LnNode),
+  // ConnectPeer(Vec<u8>),// node: String
   // ListPeer(),
 }
 
