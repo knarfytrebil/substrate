@@ -7,6 +7,7 @@ extern crate sr_primitives;
 extern crate ln_manager;
 extern crate client;
 extern crate hex;
+extern crate inherents;
 
 mod ln_event;
 
@@ -45,6 +46,7 @@ use ln_manager::lightning::ln::{
   channelmanager::{PaymentHash, PaymentPreimage, ChannelManager}
 };
 use ln_manager::lightning::util::events::Event;
+use ln_manager::lightning::chain::keysinterface::KeysInterface;
 
 use client::runtime_api::HeaderT;
 use client::{runtime_api::BlockT, BlockchainEvents, ImportNotifications};
@@ -56,9 +58,12 @@ use sr_primitives::generic::{BlockId, OpaqueDigestItemId};
 
 // use sr_primitives::generic::BlockId;
 pub use ln_primitives::{LnApi, ConsensusLog, LN_ENGINE_ID, LnNode};
+use inherents::{InherentDataProviders, InherentIdentifier};
 
 pub type Executor = tokio::runtime::TaskExecutor;
 pub type Task = Box<dyn Future01<Item = (), Error = ()> + Send>;
+
+pub const INHERENT_LN_ID: InherentIdentifier = *b"ltn_data";
 
 #[derive(Clone)]
 pub struct Drone {
@@ -111,6 +116,12 @@ impl LnBridge {
     let drone = Drone::new(executor);
     let ln_manager = runtime.block_on(LnManager::new(settings, drone)).unwrap();
     let ln_manager = Arc::new(ln_manager);
+    let key = ln_manager.node_key_str();
+    println!("ln node: {:?}", key);
+    // let keys = &ln_manager.keys;
+    // println!("ln node: {:?}", LnManager::<Drone>::node_key_str(*keys));
+    // let secret = ln_manager.keys.get_node_secret();
+    // println!("ln node: {:?}", hex_str(&PublicKey::from_secret_key(&Secp256k1::new(), &secret).serialize()));
 
     Self {
       ln_manager,
@@ -147,10 +158,7 @@ impl LnBridge {
             // ConsensusLog::PayInvoice() => Some(1),
             // ConsensusLog::CreateInvoice() => Some(1),
             ConsensusLog::ConnectPeer(node) => {
-              // let node = ConsensusLog::decode(node);
-              // let node = Decode::decode(&mut node);
-              let k = node.node_key;
-              let hex_str = hex::encode(k);
+              let hex_str = hex::encode(node);
               let bytes = hex::decode(hex_str).unwrap();
               let addr = String::from_utf8(bytes).unwrap();
               println!("<<<<<<<<<<<<<<<<<<<<<<<<<< addr {:?}", addr);

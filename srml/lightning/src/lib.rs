@@ -7,7 +7,7 @@ use system::{ensure_none, ensure_signed};
 use sr_primitives::{generic::DigestItem};
 use ln_primitives::{
   LN_ENGINE_ID, ConsensusLog,
-  Account, Tx, LnNode,
+  Account, Tx
 };
 
 pub trait Trait: system::Trait {
@@ -41,7 +41,7 @@ decl_module! {
     }
     fn connect_peer(origin, node_key: Vec<u8>) {
       // let account_id = ensure_signed(origin)?;
-      let log = ConsensusLog::ConnectPeer(LnNode {node_key});
+      let log = ConsensusLog::ConnectPeer(node_key);
       let log: DigestItem<T::Hash> = DigestItem::Consensus(LN_ENGINE_ID, log.encode());
       <system::Module<T>>::deposit_log(log.into());
     }

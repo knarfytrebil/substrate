@@ -16,6 +16,7 @@ tokio = { version = "=0.2.0-alpha.6" }
 exit-future = "0.1"
 log = { version = "0.4", optional = true }
 codec = { package = "parity-scale-codec", version = "1.0.0", default-features = false, features = ["derive"] }
+inherents = { package = "substrate-inherents", path = "../../core/inherents" }
 hex = "0.4.0"
 
 [features]
