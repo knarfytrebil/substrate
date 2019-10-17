@@ -48,12 +48,12 @@ use sr_primitives::generic::{BlockId, OpaqueDigestItemId};
 
 // use sr_primitives::generic::BlockId;
 pub use ln_primitives::{LnApi, ConsensusLog, LN_ENGINE_ID, LnNode};
-use inherents::{InherentDataProviders, InherentIdentifier};
+use primitives::offchain;
 
 pub type Executor = tokio::runtime::TaskExecutor;
 pub type Task = Box<dyn Future01<Item = (), Error = ()> + Send>;
-
-pub const INHERENT_LN_ID: InherentIdentifier = *b"ltn_data";
+// use inherents::{InherentDataProviders, InherentIdentifier};
+// pub const INHERENT_LN_ID: InherentIdentifier = *b"ltn_data";
 
 #[derive(Clone)]
 pub struct Drone {
@@ -107,6 +107,7 @@ impl LnBridge {
     let ln_manager = Arc::new(ln_manager);
     let key = ln_manager.node_key_str();
     println!("ln node: {:?}", key);
+    runtime_io::local_storage_set(offchain::StorageKind::PERSISTENT, b"ltn_keys", key.as_bytes());
     // let keys = &ln_manager.keys;
     // println!("ln node: {:?}", LnManager::<Drone>::node_key_str(*keys));
     // let secret = ln_manager.keys.get_node_secret();
