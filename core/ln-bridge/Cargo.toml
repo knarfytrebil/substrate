@@ -9,6 +9,7 @@ sr-primitives = { path = "../../core/sr-primitives" }
 client = { package = "substrate-client", path = "../../core/client" }
 # substrate-service = { path = "../../core/service" }
 # ln-manager = { git = "https://github.com/YaaMe/rust-lightning-bitcoinrpc.git", branch = "knarfytrebil" }
+runtime_io = { package = "sr-io", path = "../sr-io" }
 ln-manager = { path = "../../../pylon/rust-lightning-bitcoinrpc/ln-manager" }
 futures01 = "0.1.17"
 futures = { package = "futures-preview", version = "0.3.0-alpha.19" }

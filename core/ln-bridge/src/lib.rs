@@ -1,13 +1,3 @@
-extern crate futures;
-extern crate futures01;
-extern crate exit_future;
-extern crate ln_primitives;
-extern crate sr_primitives;
-// extern crate substrate_service;
-extern crate ln_manager;
-extern crate client;
-extern crate hex;
-extern crate inherents;
 
 mod ln_event;
 
@@ -78,7 +68,6 @@ impl Drone {
   fn new(executor: Executor) -> Self {
     Self { executor }
   }
-
   fn mine_event(&self, event: &Event) {
     match event {
       Event::FundingGenerationReady { temporary_channel_id, channel_value_satoshis, output_script, .. } => {
