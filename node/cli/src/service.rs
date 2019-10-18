@@ -177,8 +177,8 @@ macro_rules! new_full {
 			);
 			service.spawn_task(authority_discovery);
 		}
-    let ln_bge = service.ln_bridge();
-    ln_bge.bind_runtime(service.client());
+    let ln_bridge = service.ln_bridge();
+    ln_bridge.bind_runtime(service.client());
 
 		let config = grandpa::Config {
 			// FIXME #1578 make this available through chainspec

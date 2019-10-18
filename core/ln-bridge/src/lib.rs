@@ -43,6 +43,7 @@ use client::{runtime_api::BlockT, BlockchainEvents, ImportNotifications};
 use client::blockchain::HeaderBackend;
 use client::runtime_api::BlockId::Number;
 use client::BlockImportNotification;
+use client::backend::OffchainStorage;
 use sr_primitives::traits::{self, ProvideRuntimeApi, NumberFor};
 use sr_primitives::generic::{BlockId, OpaqueDigestItemId};
 
@@ -54,6 +55,7 @@ pub type Executor = tokio::runtime::TaskExecutor;
 pub type Task = Box<dyn Future01<Item = (), Error = ()> + Send>;
 // use inherents::{InherentDataProviders, InherentIdentifier};
 // pub const INHERENT_LN_ID: InherentIdentifier = *b"ltn_data";
+pub const STORAGE_PREFIX: &[u8] = b"lightning";
 
 #[derive(Clone)]
 pub struct Drone {
@@ -107,17 +109,16 @@ impl LnBridge {
     let ln_manager = Arc::new(ln_manager);
     let key = ln_manager.node_key_str();
     println!("ln node: {:?}", key);
-    runtime_io::local_storage_set(offchain::StorageKind::PERSISTENT, b"ltn_keys", key.as_bytes());
-    // let keys = &ln_manager.keys;
-    // println!("ln node: {:?}", LnManager::<Drone>::node_key_str(*keys));
-    // let secret = ln_manager.keys.get_node_secret();
-    // println!("ln node: {:?}", hex_str(&PublicKey::from_secret_key(&Secp256k1::new(), &secret).serialize()));
 
     Self {
       ln_manager,
       exit,
       runtime,
     }
+  }
+  pub fn storage_ltn_key<S: OffchainStorage>(&self, mut storage: S) {
+    let key = self.ln_manager.node_key_str();
+    storage.set(STORAGE_PREFIX, b"ltn_keys", key.as_bytes());
   }
   pub fn ln_manager(&self) -> Arc<LnManager<Drone>> {
     self.ln_manager.clone()
