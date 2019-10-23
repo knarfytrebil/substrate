@@ -12,6 +12,9 @@ ln-primitives = { path = "../../core/ln-bridge/primitives", default-features = f
 inherents = { package = "substrate-inherents", path = "../../core/inherents", default-features = false }
 support = { package = "srml-support", path = "../support", default-features = false }
 system = { package = "srml-system", path = "../system", default-features = false }
+runtime_io = { package = "sr-io", path = "../../core/sr-io", default-features = false }
+primitives = { package="substrate-primitives", path = "../../core/primitives", default-features = false }
+offchain-primitives = { package = "substrate-offchain-primitives", path = "../../core/offchain/primitives", default-features = false }
 
 [features]
 default = ["std"]

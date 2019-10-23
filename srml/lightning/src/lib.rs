@@ -2,19 +2,29 @@
 
 use rstd::prelude::*;
 use codec::{self as codec, Encode, Decode, Error};
-use support::{decl_module, decl_storage, decl_event};
-use system::{ensure_none, ensure_signed};
-use sr_primitives::{generic::DigestItem};
+use support::{decl_module, decl_storage, decl_event, print};
+use system::{ensure_none, ensure_signed, offchain::SubmitUnsignedTransaction};
+use sr_primitives::{
+  generic::DigestItem,
+  transaction_validity::{
+    TransactionValidity, TransactionLongevity, ValidTransaction, InvalidTransaction,
+  }
+};
 use ln_primitives::{
   LN_ENGINE_ID, ConsensusLog,
   Account, Tx
 };
+use primitives::offchain::StorageKind;
 
 pub trait Trait: system::Trait {
+  type Call: From<Call<Self>>;
+  type SubmitTransaction: SubmitUnsignedTransaction<Self, <Self as Trait>::Call>;
 }
 
 decl_storage! {
   trait Store for Module<T: Trait> as Lightning {
+    SomeFlag: u64;
+    PubKey: Vec<u8>;
   }
 }
 
@@ -45,9 +55,45 @@ decl_module! {
       let log: DigestItem<T::Hash> = DigestItem::Consensus(LN_ENGINE_ID, log.encode());
       <system::Module<T>>::deposit_log(log.into());
     }
+
+    fn sync_pub_key(origin, key: Vec<u8>) {
+      PubKey::put(key);
+    }
+
+    fn on_finalize(block_number: T::BlockNumber) {
+    }
+
+    fn offchain_worker(now: T::BlockNumber) {
+      let pub_key = runtime_io::local_storage_get(StorageKind::PERSISTENT, b"ltn_keys").unwrap();
+      let call = Call::sync_pub_key(pub_key);
+      T::SubmitTransaction::submit_unsigned(call);
+    }
   }
 }
 
+const DB_KEY: &[u8] = b"ltn_keys";
+
+impl<T: Trait> Module<T> {
+  pub(crate) fn offchain(now: T::BlockNumber) {
+  }
+}
+impl<T: Trait> support::unsigned::ValidateUnsigned for Module<T> {
+	type Call = Call<T>;
+  fn validate_unsigned(call: &Self::Call) -> TransactionValidity {
+    if let Call::sync_pub_key(_) = call {
+      Ok(ValidTransaction {
+        priority: 0,
+				requires: vec![],
+        provides: vec![("abcdefg").encode()],
+				// provides: vec![(current_session, ()).encode()],
+				longevity: TransactionLongevity::max_value(),
+				propagate: true,
+      })
+    } else {
+      InvalidTransaction::Call.into()
+    }
+  }
+}
 // impl<T: Trait> Module<T> {
 //   fn deposit_log(log: ConsensusLog<T::BlockNumber>) {
 // 		let log: DigestItem<T::Hash> = DigestItem::Consensus(LN_ENGINE_ID, log.encode());

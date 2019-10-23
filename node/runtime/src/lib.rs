@@ -499,6 +499,8 @@ impl system::offchain::CreateTransaction<Runtime, UncheckedExtrinsic> for Runtim
 }
 
 impl lightning::Trait for Runtime {
+  type Call = Call;
+  type SubmitTransaction = SubmitTransaction;
 }
 
 construct_runtime!(
@@ -531,7 +533,7 @@ construct_runtime!(
 		AuthorityDiscovery: authority_discovery::{Module, Call, Config<T>},
 		Offences: offences::{Module, Call, Storage, Event},
 		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
-    Lightning: lightning::{Module, Call, Storage},
+    Lightning: lightning::{Module, Call, Storage, ValidateUnsigned},
 	}
 );
 

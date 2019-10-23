@@ -226,6 +226,7 @@ decl_storage! {
 		/// The current set of keys that may issue a heartbeat.
 		Keys get(keys): Vec<T::AuthorityId>;
 
+    TriggerFlag: u64;
 		/// For each session index we keep a mapping of `AuthorityId`
 		/// to `offchain::OpaqueNetworkState`.
 		ReceivedHeartbeats get(received_heartbeats): double_map SessionIndex,
@@ -278,14 +279,18 @@ decl_module! {
 			}
 		}
 
+    fn set_flag(flag: u64) {
+      TriggerFlag::put(5);
+    }
+
 		// Runs after every block.
 		fn offchain_worker(now: T::BlockNumber) {
 			// Only send messages if we are a potential validator.
 			if runtime_io::is_validator() {
 				Self::offchain(now);
 			}
+      // Self::do_set_flag();
 		}
-	}
 }
 
 impl<T: Trait> Module<T> {
@@ -295,6 +300,12 @@ impl<T: Trait> Module<T> {
 		let current_session = <session::Module<T>>::current_index();
 		<ReceivedHeartbeats>::exists(&current_session, &authority_index)
 	}
+
+  // pub(crate) fn do_set_flag() {
+  //   let call = Call::set_flag(5);
+  //   T::SubmitTransaction::submit_unsigned(call)
+	// 		.map_err(|_| OffchainErr::SubmitTransaction)?;
+  // }
 
 	pub(crate) fn offchain(now: T::BlockNumber) {
 		let next_gossip = <GossipAt<T>>::get();
