@@ -74,7 +74,7 @@ use app_crypto::RuntimeAppPublic;
 use codec::{Encode, Decode};
 use primitives::offchain::{OpaqueNetworkState, StorageKind};
 use rstd::prelude::*;
-use session::historical::IdentificationTuple;
+use session::historical::{IdentificationTuple};
 use sr_primitives::{
 	traits::{Convert, Member, Printable, Saturating}, Perbill,
 	transaction_validity::{
@@ -226,7 +226,7 @@ decl_storage! {
 		/// The current set of keys that may issue a heartbeat.
 		Keys get(keys): Vec<T::AuthorityId>;
 
-    TriggerFlag: u64;
+                TriggerFlag: u64;
 		/// For each session index we keep a mapping of `AuthorityId`
 		/// to `offchain::OpaqueNetworkState`.
 		ReceivedHeartbeats get(received_heartbeats): double_map SessionIndex,
@@ -279,9 +279,9 @@ decl_module! {
 			}
 		}
 
-    fn set_flag(flag: u64) {
-      TriggerFlag::put(5);
-    }
+                fn set_flag(origin, flag: u64) {
+                    TriggerFlag::put(5);
+                }
 
 		// Runs after every block.
 		fn offchain_worker(now: T::BlockNumber) {
@@ -289,8 +289,9 @@ decl_module! {
 			if runtime_io::is_validator() {
 				Self::offchain(now);
 			}
-      // Self::do_set_flag();
+                        Self::do_set_flag();
 		}
+        }
 }
 
 impl<T: Trait> Module<T> {
@@ -301,11 +302,12 @@ impl<T: Trait> Module<T> {
 		<ReceivedHeartbeats>::exists(&current_session, &authority_index)
 	}
 
-  // pub(crate) fn do_set_flag() {
-  //   let call = Call::set_flag(5);
-  //   T::SubmitTransaction::submit_unsigned(call)
-	// 		.map_err(|_| OffchainErr::SubmitTransaction)?;
-  // }
+        pub(crate) fn do_set_flag() -> Result<(), OffchainErr> {
+            let call = Call::set_flag(5);
+            T::SubmitTransaction::submit_unsigned(call)
+                .map_err(|_| OffchainErr::SubmitTransaction)?;
+            Ok(())
+        }
 
 	pub(crate) fn offchain(now: T::BlockNumber) {
 		let next_gossip = <GossipAt<T>>::get();
