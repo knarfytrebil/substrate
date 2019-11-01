@@ -1117,6 +1117,13 @@ ServiceBuilder<
 			telemetry
 		});
 
+    // lightning bridge
+    let ln_bridge = ln_bridge::LnBridge::new(exit.clone());
+    let ln_bridge = Arc::new(ln_bridge);
+    let ln_tasks = ln_bridge.bind_client(client.clone());
+    ln_bridge.storage_ltn_key(backend.offchain_storage().unwrap());
+    to_spawn_tx.unbounded_send(ln_tasks);
+
 		Ok(Service {
 			client,
 			network,
@@ -1135,6 +1142,7 @@ ServiceBuilder<
 			_offchain_workers: offchain_workers,
 			_telemetry_on_connect_sinks: telemetry_connection_sinks.clone(),
 			keystore,
+      ln_bridge,
 			marker: PhantomData::<TBl>,
 		})
 	}
