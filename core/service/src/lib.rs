@@ -24,6 +24,9 @@ pub mod config;
 pub mod chain_ops;
 pub mod error;
 
+mod builder;
+mod status_sinks;
+
 use std::io;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
@@ -71,14 +74,13 @@ pub use ln_bridge::{self, LnBridge};
 const DEFAULT_PROTOCOL_ID: &str = "sup";
 
 /// Substrate service.
-pub struct NewService<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> {
+pub struct Service<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> {
 	client: Arc<TCl>,
 	select_chain: Option<TSc>,
 	network: Arc<TNet>,
 	/// Sinks to propagate network status updates.
-	network_status_sinks: Arc<Mutex<Vec<mpsc::UnboundedSender<(
-		TNetStatus, NetworkState
-	)>>>>,
+	/// For each element, every time the `Interval` fires we push an element on the sender.
+	network_status_sinks: Arc<Mutex<status_sinks::StatusSinks<(TNetStatus, NetworkState)>>>,
 	transaction_pool: Arc<TTxPool>,
 	/// A future that resolves when the service has exited, this is useful to
 	/// make sure any internally spawned futures stop when the service does.
@@ -457,7 +459,6 @@ macro_rules! new_impl {
 	}}
 }
 
-mod builder;
 
 /// Abstraction over a Substrate service.
 pub trait AbstractService: 'static + Future<Item = (), Error = Error> +
@@ -518,7 +519,7 @@ pub trait AbstractService: 'static + Future<Item = (), Error = Error> +
 	fn network(&self) -> Arc<NetworkService<Self::Block, Self::NetworkSpecialization, H256>>;
 
 	/// Returns a receiver that periodically receives a status of the network.
-	fn network_status(&self) -> mpsc::UnboundedReceiver<(NetworkStatus<Self::Block>, NetworkState)>;
+	fn network_status(&self, interval: Duration) -> mpsc::UnboundedReceiver<(NetworkStatus<Self::Block>, NetworkState)>;
 
 	/// Get shared transaction pool instance.
 	fn transaction_pool(&self) -> Arc<TransactionPool<Self::TransactionPoolApi>>;
@@ -529,7 +530,7 @@ pub trait AbstractService: 'static + Future<Item = (), Error = Error> +
 }
 
 impl<TBl, TBackend, TExec, TRtApi, TSc, TNetSpec, TExPoolApi, TOc> AbstractService for
-	NewService<TBl, Client<TBackend, TExec, TBl, TRtApi>, TSc, NetworkStatus<TBl>,
+	Service<TBl, Client<TBackend, TExec, TBl, TRtApi>, TSc, NetworkStatus<TBl>,
 		NetworkService<TBl, TNetSpec, H256>, TransactionPool<TExPoolApi>, TOc>
 where
 	TBl: BlockT<Hash = H256>,
@@ -602,9 +603,9 @@ where
 		self.network.clone()
 	}
 
-	fn network_status(&self) -> mpsc::UnboundedReceiver<(NetworkStatus<Self::Block>, NetworkState)> {
+	fn network_status(&self, interval: Duration) -> mpsc::UnboundedReceiver<(NetworkStatus<Self::Block>, NetworkState)> {
 		let (sink, stream) = mpsc::unbounded();
-		self.network_status_sinks.lock().push(sink);
+		self.network_status_sinks.lock().push(interval, sink);
 		stream
 	}
 
@@ -622,7 +623,7 @@ where
 }
 
 impl<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> Future for
-	NewService<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc>
+	Service<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc>
 {
 	type Item = ();
 	type Error = Error;
@@ -655,7 +656,7 @@ impl<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> Future for
 }
 
 impl<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> Executor<Box<dyn Future<Item = (), Error = ()> + Send>> for
-	NewService<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc>
+	Service<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc>
 {
 	fn execute(
 		&self,
@@ -682,7 +683,7 @@ fn build_network_future<
 	roles: Roles,
 	mut network: network::NetworkWorker<B, S, H>,
 	client: Arc<C>,
-	status_sinks: Arc<Mutex<Vec<mpsc::UnboundedSender<(NetworkStatus<B>, NetworkState)>>>>,
+	status_sinks: Arc<Mutex<status_sinks::StatusSinks<(NetworkStatus<B>, NetworkState)>>>,
 	rpc_rx: futures03::channel::mpsc::UnboundedReceiver<rpc::system::Request<B>>,
 	should_have_peers: bool,
 	dht_event_tx: Option<mpsc::Sender<DhtEvent>>,
@@ -690,10 +691,6 @@ fn build_network_future<
 	// Compatibility shim while we're transitioning to stable Futures.
 	// See https://github.com/paritytech/substrate/issues/3099
 	let mut rpc_rx = futures03::compat::Compat::new(rpc_rx.map(|v| Ok::<_, ()>(v)));
-
-	// Interval at which we send status updates on the status stream.
-	const STATUS_INTERVAL: Duration = Duration::from_millis(5000);
-	let mut status_interval = tokio_timer::Interval::new_interval(STATUS_INTERVAL);
 
 	let mut imported_blocks_stream = client.import_notification_stream().fuse()
 		.map(|v| Ok::<_, ()>(v)).compat();
@@ -762,7 +759,7 @@ fn build_network_future<
 		}
 
 		// Interval report for the external API.
-		while let Ok(Async::Ready(_)) = status_interval.poll() {
+		status_sinks.lock().poll(|| {
 			let status = NetworkStatus {
 				sync_state: network.sync_state(),
 				best_seen_block: network.best_seen_block(),
@@ -773,9 +770,8 @@ fn build_network_future<
 				average_upload_per_sec: network.average_upload_per_sec(),
 			};
 			let state = network.network_state();
-
-			status_sinks.lock().retain(|sink| sink.unbounded_send((status.clone(), state.clone())).is_ok());
-		}
+			(status, state)
+		});
 
 		// Main network polling.
 		while let Ok(Async::Ready(Some(Event::Dht(event)))) = network.poll().map_err(|err| {
@@ -827,7 +823,7 @@ pub struct NetworkStatus<B: BlockT> {
 }
 
 impl<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> Drop for
-	NewService<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc>
+	Service<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc>
 {
 	fn drop(&mut self) {
 		debug!(target: "service", "Substrate service shutdown");
@@ -880,15 +876,16 @@ fn start_rpc_servers<C, G, E, H: FnMut() -> rpc_servers::RpcHandler<rpc::Metadat
 
 /// Starts RPC servers that run in their own thread, and returns an opaque object that keeps them alive.
 #[cfg(target_os = "unknown")]
-fn start_rpc_servers<C, G, E, H: FnMut() -> components::RpcHandler>(
+fn start_rpc_servers<C, G, E, H: FnMut() -> rpc_servers::RpcHandler<rpc::Metadata>>(
 	_: &Configuration<C, G, E>,
 	_: H
-) -> Result<Box<std::any::Any + Send + Sync>, error::Error> {
+) -> Result<Box<dyn std::any::Any + Send + Sync>, error::Error> {
 	Ok(Box::new(()))
 }
 
 /// An RPC session. Used to perform in-memory RPC queries (ie. RPC queries that don't go through
 /// the HTTP or WebSockets server).
+#[derive(Clone)]
 pub struct RpcSession {
 	metadata: rpc::Metadata,
 }
