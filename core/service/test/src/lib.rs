@@ -160,6 +160,7 @@ fn node_config<G, E: Clone> (
 			enable_mdns: false,
 			wasm_external_transport: None,
 		},
+		propagate_extr: false,
 	};
 
 	Configuration {
@@ -196,6 +197,7 @@ fn node_config<G, E: Clone> (
 		force_authoring: false,
 		disable_grandpa: false,
 		dev_key_seed: key_seed,
+		n_conf_file: None,
 	}
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+ // Copyright 2017-2019 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -21,11 +21,17 @@
 use codec::Encode;
 use std::{convert::TryFrom, str};
 use primitives::{
-	blake2_128, blake2_256, twox_64, twox_128, twox_256, ed25519, sr25519, Blake2Hasher, Pair,
-	crypto::KeyTypeId, offchain,
+	blake2_128, blake2_256, twox_64, twox_128, twox_256, ed25519, sr25519,hbbft_thresh, Pair, crypto::KeyTypeId,
+	offchain,   Blake2Hasher, //hexdisplay::HexDisplay,H256,sandbox as sandbox_primitives, 
+	//traits::Externalities, //child_storage_key::ChildStorageKey,
 };
 use trie::{TrieConfiguration, trie_types::Layout};
-use wasm_interface::{FunctionContext, Pointer, PointerType, Result as WResult, WordSize};
+
+use log::{info};//trace
+use wasm_interface::{
+	FunctionContext,  Pointer, WordSize,  PointerType, //HostFunctions, Sandbox, MemoryId
+	Result as WResult,
+};
 
 #[cfg(feature="wasm-extern-trace")]
 macro_rules! debug_trace {
@@ -570,6 +576,7 @@ impl_wasm_host_interface! {
 			pubkey_data: Pointer<u8>,
 		) -> u32 {
 			let mut sig = [0u8; 64];
+			info!("ext_ed25519_verify triggered");
 			context.read_memory_into(sig_data, &mut sig[..])
 				.map_err(|_| "Invalid attempt to get signature in ext_ed25519_verify")?;
 			let mut pubkey = [0u8; 32];
@@ -617,6 +624,39 @@ impl_wasm_host_interface! {
 				.map_err(|_| "Invalid attempt to set out in ext_ed25519_generate".into())
 		}
 
+		ext_hb_node_generate(
+			id_data: Pointer<u8>,
+			seed: Pointer<u8>,
+			seed_len: WordSize,
+			out: Pointer<u8>,
+		) {
+			let mut id = [0u8; 4];
+			context.read_memory_into(id_data, &mut id[..])
+				.map_err(|_| "Invalid attempt to get id in ext_hb_node_generate")?;
+			let key_type = KeyTypeId(id);
+
+			let seed = if seed_len == 0 {
+				None
+			} else {
+				Some(
+					context.read_memory(seed, seed_len)
+						.map_err(|_| "Invalid attempt to get seed in ext_hb_node_generate")?
+				)
+			};
+
+			let seed = seed.as_ref()
+				.map(|seed|
+					std::str::from_utf8(&seed)
+						.map_err(|_| "Seed not a valid utf8 string in ext_hb_node_generate")
+				).transpose()?;
+
+			let pubkey = runtime_io::hb_node_generate(key_type, seed);
+
+			context.write_memory(out, pubkey.as_ref())
+				.map_err(|_| "Invalid attempt to set out in ext_hb_node_generate".into())
+		}
+
+
 		ext_ed25519_sign(
 			id_data: Pointer<u8>,
 			pubkey_data: Pointer<u8>,
@@ -651,6 +691,42 @@ impl_wasm_host_interface! {
 			}
 		}
 
+		ext_hb_node_sign(
+			id_data: Pointer<u8>,
+			pubkey_data: Pointer<u8>,
+			msg_data: Pointer<u8>,
+			msg_len: WordSize,
+			out: Pointer<u8>,
+		) -> u32 {
+			let mut id = [0u8; 4];
+			context.read_memory_into(id_data, &mut id[..])
+				.map_err(|_| "Invalid attempt to get id in ext_hb_node_sign")?;
+			let key_type = KeyTypeId(id);
+
+			let mut pubkey = [0u8; hbbft_thresh::PK_SIZE];
+			context.read_memory_into(pubkey_data, &mut pubkey[..])
+				.map_err(|_| "Invalid attempt to get pubkey in ext_hb_node_sign")?;
+
+			let msg = context.read_memory(msg_data, msg_len)
+				.map_err(|_| "Invalid attempt to get message in ext_hb_node_sign")?;
+
+			let pub_key = hbbft_thresh::Public::try_from(pubkey.as_ref())
+				.map_err(|_| "Invalid `hb_node` public key")?;
+
+			let signature = runtime_io::hb_node_sign(key_type, &pub_key, &msg);
+
+			match signature {
+				Some(signature) => {
+					context.write_memory(out, signature.as_ref())
+						.map_err(|_| "Invalid attempt to set out in ext_hb_node_sign")?;
+					Ok(0)
+				},
+				None => Ok(1),
+			}
+		}
+
+
+
 		ext_sr25519_public_keys(id_data: Pointer<u8>, result_len: Pointer<u32>) -> Pointer<u8> {
 			let mut id = [0u8; 4];
 			context.read_memory_into(id_data, &mut id[..])
@@ -670,6 +746,47 @@ impl_wasm_host_interface! {
 			Ok(offset)
 		}
 
+		ext_hb_node_public_keys(id_data: Pointer<u8>, result_len: Pointer<u32>) -> Pointer<u8> {
+			let mut id = [0u8; 4];
+			context.read_memory_into(id_data, &mut id[..])
+				.map_err(|_| "Invalid attempt to get id in ext_hb_node_public_keys")?;
+			let key_type = KeyTypeId(id);
+
+			let keys = runtime_io::hb_node_public_keys(key_type).encode();
+
+			let len = keys.len() as u32;
+			let offset = context.allocate_memory(len)?;
+
+			context.write_memory(offset, keys.as_ref())
+				.map_err(|_| "Invalid attempt to set memory in ext_hb_node_public_keys")?;
+			context.write_primitive(result_len, len)
+				.map_err(|_| "Invalid attempt to write result_len in ext_hb_node_public_keys")?;
+
+			Ok(offset)
+		}
+
+		ext_hb_node_verify(
+			msg_data: Pointer<u8>,
+			msg_len: WordSize,
+			sig_data: Pointer<u8>,
+			pubkey_data: Pointer<u8>,
+		) -> u32 {
+			let mut sig = [0u8; hbbft_thresh::SIG_SIZE];
+			context.read_memory_into(sig_data, &mut sig[..])
+				.map_err(|_| "Invalid attempt to get signature in ext_hb_node_verify")?;
+			let mut pubkey = [0u8; hbbft_thresh::PK_SIZE];
+			context.read_memory_into(pubkey_data, &mut pubkey[..])
+				.map_err(|_| "Invalid attempt to get pubkey in ext_hb_node_verify")?;
+			let msg = context.read_memory(msg_data, msg_len)
+				.map_err(|_| "Invalid attempt to get message in ext_hb_node_verify")?;
+
+			Ok(if hbbft_thresh::Pair::verify_weak(&hbbft_thresh::Signature(sig).as_ref(), &msg, &hbbft_thresh::Public(pubkey)) {
+				0
+			} else {
+				1
+			})
+		}
+
 		ext_sr25519_verify(
 			msg_data: Pointer<u8>,
 			msg_len: WordSize,
@@ -677,6 +794,7 @@ impl_wasm_host_interface! {
 			pubkey_data: Pointer<u8>,
 		) -> u32 {
 			let mut sig = [0u8; 64];
+			info!("ext_sr25519_verify triggered");
 			context.read_memory_into(sig_data, &mut sig[..])
 				.map_err(|_| "Invalid attempt to get signature in ext_sr25519_verify")?;
 			let mut pubkey = [0u8; 32];

@@ -1,0 +1,7 @@
+binop_separator="Back"
+brace_style="AlwaysNextLine"
+control_brace_style="AlwaysNextLine"
+edition="2018"
+hard_tabs=false
+tab_spaces=2
+# fn_args_layout="Compressed"

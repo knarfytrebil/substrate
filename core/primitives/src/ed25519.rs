@@ -17,6 +17,9 @@
 // tag::description[]
 //! Simple Ed25519 API.
 // end::description[]
+#[cfg(feature = "std")]
+use log::info;
+
 
 use rstd::vec::Vec;
 
@@ -449,11 +452,13 @@ impl TraitPair for Pair {
 	/// This doesn't use the type system to ensure that `sig` and `pubkey` are the correct
 	/// size. Use it only if you're coming from byte buffers and need the speed.
 	fn verify_weak<P: AsRef<[u8]>, M: AsRef<[u8]>>(sig: &[u8], message: M, pubkey: P) -> bool {
+		info!("ext_ed25519_verify weak triggered");
 		let public_key = match ed25519_dalek::PublicKey::from_bytes(pubkey.as_ref()) {
 			Ok(pk) => pk,
 			Err(_) => return false,
 		};
-
+	    info!("ed pk: {:?} ",&public_key);
+			
 		let sig = match ed25519_dalek::Signature::from_bytes(sig) {
 			Ok(s) => s,
 			Err(_) => return false

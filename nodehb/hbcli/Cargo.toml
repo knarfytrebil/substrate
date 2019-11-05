@@ -1,0 +1,78 @@
+[package]
+name = "hbnode-cli"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+description = "Substrate node implementation in Rust."
+build = "build.rs"
+edition = "2018"
+default-run = "substrate-hb"
+
+[[bin]]
+name = "substrate-hb"
+path = "bin/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+log = "0.4"
+futures = "0.1"
+jsonrpc-core = "14.0.3"
+hb-node-rpc = { path = "../rpc" }
+substrate-rpc = { package = "substrate-rpc", path = "../../core/rpc" }
+parity-codec = { package = "parity-scale-codec", version = "1.0.0", features = ["derive"] }
+sr-io = { path = "../../core/sr-io" }
+client = { package = "substrate-client", path = "../../core/client" }
+primitives = { package = "substrate-primitives", path = "../../core/primitives" }
+inherents = { package = "substrate-inherents", path = "../../core/inherents" }
+hb-node-runtime = { path = "../runtime" }
+hb-node-primitives = { path = "../primitives" }
+hex-literal = "0.2"
+substrate-basic-authorship = { path = "../../core/basic-authorship" }
+substrate-service = { path = "../../core/service" }
+transaction_pool = { package = "substrate-transaction-pool", path = "../../core/transaction-pool" }
+network = { package = "substrate-network", path = "../../core/network" }
+badger = { package = "substrate-badger-mushroom", path = "../../core/hbbft" }
+badger_primitives = { package = "substrate-badger-primitives", path = "../../core/hbbft/primitives" }
+sr-primitives = { path = "../../core/sr-primitives" }
+hb-node-executor = { path = "../executor" }
+substrate-keystore = { path = "../../core/keystore" }
+substrate-telemetry = { package = "substrate-telemetry", path = "../../core/telemetry" }
+structopt = "0.3.3"
+keyring = { package = "substrate-keyring", path = "../../core/keyring" }
+indices = { package = "srml-indices", path = "../../srml/indices" }
+
+timestamp = { package = "srml-timestamp", path = "../../srml/timestamp", default-features = false }
+rand = "0.7.2"
+finality_tracker = { package = "srml-finality-tracker", path = "../../srml/finality-tracker", default-features = false }
+system = { package = "srml-system", path = "../../srml/system" }
+balances = { package = "srml-balances", path = "../../srml/balances", default-features = false }
+futures03 = { package = "futures-preview", version = "=0.3.0-alpha.19", features = ["compat"] }
+parking_lot = "0.8.0"
+keygen = { package="substrate-keygen", path = "../../core/keygen" }
+transaction-payment = { package = "srml-transaction-payment", path = "../../srml/transaction-payment" }
+
+# CLI-specific dependencies
+tokio = { version = "0.1.22", optional = true }
+exit-future = { version = "0.1.4", optional = true }
+substrate-cli = { path = "../../core/cli", optional = true }
+transaction-factory = { path = "../../test-utils/transaction-factory", optional = true }
+ctrlc = { version = "3.1.3", features = ["termination"], optional = true }
+
+[dev-dependencies]
+consensus-common = { package = "substrate-consensus-common", path = "../../core/consensus/common" }
+service-test = { package = "substrate-service-test", path = "../../core/service/test" }
+
+[build-dependencies]
+substrate-cli = { package = "substrate-cli", path = "../../core/cli" }
+structopt = "0.3.3"
+vergen = "3.0.4"
+
+[features]
+default = ["cli"]
+cli = [
+	"substrate-cli",
+	"transaction-factory",
+	"tokio",
+	"exit-future",
+	"ctrlc",
+	# "substrate-service/rocksdb"
+]

@@ -20,6 +20,9 @@
 //! Note: `CHAIN_CODE_LENGTH` must be equal to `crate::crypto::JUNCTION_ID_LEN`
 //! for this to work.
 // end::description[]
+#[cfg(feature = "std")]
+use log::info;
+
 use rstd::vec::Vec;
 #[cfg(feature = "full_crypto")]
 use schnorrkel::{signing_context, ExpansionMode, Keypair, SecretKey, MiniSecretKey, PublicKey,
@@ -500,10 +503,15 @@ impl TraitPair for Pair {
 		// Match both schnorrkel 0.1.1 and 0.8.0+ signatures, supporting both wallets
 		// that have not been upgraded and those that have. To swap to 0.8.0 only,
 		// create `schnorrkel::Signature` and pass that into `verify_simple`
+		info!("sr verify_weak triggered ");
 		match PublicKey::from_bytes(pubkey.as_ref()) {
-			Ok(pk) => pk.verify_simple_preaudit_deprecated(
+			Ok(pk) => 
+			{
+				info!("sr pk: {:?} {:?} {:?}",&pk,&message.as_ref(),&sig);
+			  pk.verify_simple_preaudit_deprecated(
 				SIGNING_CTX, message.as_ref(), &sig,
-			).is_ok(),
+			).is_ok()
+		   }   ,
 			Err(_) => false,
 		}
 	}

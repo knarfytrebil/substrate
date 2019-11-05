@@ -1002,6 +1002,7 @@ impl<B: BlockT> ChainSync<B> {
 		let header = &announce.header;
 		let number = *header.number();
 		debug!(target: "sync", "Received block announcement with number {:?}", number);
+		return OnBlockAnnounce::Nothing;//TODO?
 		if number.is_zero() {
 			warn!(target: "sync", "Ignored genesis block (#0) announcement from {}: {}", who, hash);
 			return OnBlockAnnounce::Nothing

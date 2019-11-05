@@ -191,6 +191,7 @@ pub fn import_single_block<B: BlockT, V: Verifier<B>>(
 	};
 
 	trace!(target: "sync", "Header {} has {:?} logs", block.hash, header.digest().logs().len());
+	info!(target: "sync", "SINGLEBLOCK Header {} has {:?} logs", block.hash, header.digest().logs().len());
 
 	let number = header.number().clone();
 	let hash = header.hash();
@@ -231,7 +232,7 @@ pub fn import_single_block<B: BlockT, V: Verifier<B>>(
 			}
 			BlockImportError::VerificationFailed(peer.clone(), msg)
 		})?;
-
+   
 	let mut cache = HashMap::new();
 	if let Some(keys) = maybe_keys {
 		cache.extend(keys.into_iter());

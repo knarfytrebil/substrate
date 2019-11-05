@@ -16,8 +16,9 @@
 
 //! Shareable Substrate traits.
 
-use crate::{crypto::KeyTypeId, ed25519, sr25519};
-
+#[cfg(feature = "std")]
+use crate::{crypto::KeyTypeId, ed25519, sr25519, hbbft_thresh};//child_storage_key::ChildStorageKey,
+#[cfg(feature = "std")]
 use std::{fmt::{Debug, Display}, panic::UnwindSafe};
 
 pub use externalities::{Externalities, ExternalitiesExt};
@@ -41,6 +42,7 @@ pub trait BareCryptoStore: Send + Sync {
 
 	/// Returns all ed25519 public keys for the given key type.
 	fn ed25519_public_keys(&self, id: KeyTypeId) -> Vec<ed25519::Public>;
+
 	/// Generate a new ed25519 key pair for the given key type and an optional seed.
 	///
 	/// If the given seed is `Some(_)`, the key pair will only be stored in memory.
@@ -51,6 +53,21 @@ pub trait BareCryptoStore: Send + Sync {
 		id: KeyTypeId,
 		seed: Option<&str>,
 	) -> Result<ed25519::Public, String>;
+
+	/// Generate a new HBBFT key pair for the given key type and an optional seed.
+	///
+	fn hb_node_generate_new(
+		&mut self,
+		id: KeyTypeId,
+		seed: Option<&str>,
+	) -> Result<hbbft_thresh::Public, String>;
+
+   /// Returns all ed25519 public keys for the given key type.
+	fn hb_node_public_keys(&self, id: KeyTypeId) -> Vec<hbbft_thresh::Public>;
+
+  /// Returns the ed25519 key pair for the given key type and public key combination.
+	fn hb_node_key_pair(&self, id: KeyTypeId, pub_key: &hbbft_thresh::Public) -> Option<hbbft_thresh::Pair>;
+
 
 	/// Returns the ed25519 key pair for the given key type and public key combination.
 	fn ed25519_key_pair(&self, id: KeyTypeId, pub_key: &ed25519::Public) -> Option<ed25519::Pair>;
@@ -65,6 +82,19 @@ pub trait BareCryptoStore: Send + Sync {
 
 	/// Get the password for this store.
 	fn password(&self) -> Option<&str>;
+
+    /// Initiates a (key) request with a given id, returns error if request exists or could not be created
+	fn initiate_request(&self, request_id: &[u8],key_type: KeyTypeId) -> Result<(), ()>;
+
+	/// gets data of the request details
+    fn get_request_data(&self, request_id: &[u8],key_type: KeyTypeId) -> Option<Vec<u8>>;
+
+	/// sets request data (binary blob) 
+	fn set_request_data(&self, request_id: &[u8],key_type: KeyTypeId,request_data: &[u8]) ->Result<(),()>;
+
+
+
+
 }
 
 /// A pointer to the key store.

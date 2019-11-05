@@ -1,0 +1,90 @@
+[package]
+name = "hb-node-runtime"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+build = "build.rs"
+
+[dependencies]
+integer-sqrt = { version = "0.1.2" }
+safe-mix = { version = "1.0", default-features = false }
+codec = { package = "parity-scale-codec", version = "1.0.0", default-features = false, features = ["derive"] }
+primitives = { package = "substrate-primitives",  path = "../../core/primitives", default-features = false }
+client = { package = "substrate-client", path = "../../core/client", default-features = false }
+rstd = { package = "sr-std", path = "../../core/sr-std", default-features = false }
+sr-primitives = { path = "../../core/sr-primitives", default-features = false }
+offchain-primitives = { package = "substrate-offchain-primitives", path = "../../core/offchain/primitives", default-features = false }
+version = { package = "sr-version", path = "../../core/sr-version", default-features = false }
+support = { package = "srml-support", path = "../../srml/support", default-features = false }
+authorship = { package = "srml-authorship", path = "../../srml/authorship", default-features = false }
+#badger = { package = "substrate-badger-mushroom", path = "../../core/hbbft" }
+#badger-primitives = { package = "substrate-badger-primitives", path = "../../core/hbbft/primitives" }
+contracts = { package = "srml-contracts", path = "../../srml/contracts", default-features = false }
+contracts-rpc-runtime-api = { package = "srml-contracts-rpc-runtime-api", path = "../../srml/contracts/rpc/runtime-api/", default-features = false }
+#consensus-primitives = { package = "substrate-consensus-common-primitives", path = "../../core/consensus/common/primitives", default-features = false }
+balances = { package = "srml-balances", path = "../../srml/balances", default-features = false }
+elections = { package = "srml-elections", path = "../../srml/elections", default-features = false }
+executive = { package = "srml-executive", path = "../../srml/executive", default-features = false }
+finality-tracker = { package = "srml-finality-tracker", path = "../../srml/finality-tracker", default-features = false }
+srml-badger = { package = "srml-badger", path = "../../srml/hbbft", default-features = false }
+srml-keygen = { package = "srml-keygen", path = "../../srml/keygen", default-features = false }
+
+indices = { package = "srml-indices", path = "../../srml/indices", default-features = false }
+membership = { package = "srml-membership", path = "../../srml/membership", default-features = false }
+session = { package = "srml-session", path = "../../srml/session", default-features = false, features = ["historical"] }
+system = { package = "srml-system", path = "../../srml/system", default-features = false }
+system-rpc-runtime-api = { package = "srml-system-rpc-runtime-api", path = "../../srml/system/rpc/runtime-api/", default-features = false }
+timestamp = { package = "srml-timestamp", path = "../../srml/timestamp", default-features = false }
+treasury = { package = "srml-treasury", path = "../../srml/treasury", default-features = false }
+sudo = { package = "srml-sudo", path = "../../srml/sudo", default-features = false }
+hb-node-primitives = { path = "../primitives", default-features = false }
+rustc-hex = { version = "2.0", optional = true }
+serde = { version = "1.0", optional = true }
+substrate-keyring = { path = "../../core/keyring", optional = true }
+substrate-session = { path = "../../core/session", default-features = false }
+substrate-badger-rapi = { package="substrate-badger-rapi", path="../../core/hbbft/runtime_api" , default-features = false }
+randomness-collective-flip = { package = "srml-randomness-collective-flip", path = "../../srml/randomness-collective-flip", default_features = false }
+transaction-payment = { package = "srml-transaction-payment", path = "../../srml/transaction-payment", default-features = false }
+
+[build-dependencies]
+wasm-builder-runner = { package = "substrate-wasm-builder-runner", version = "1.0.2", path = "../../core/utils/wasm-builder-runner" }
+
+[features]
+default = ["std"]
+no_std = [
+
+]
+std = [
+	"codec/std",
+	"primitives/std",
+	"rstd/std",
+	"sr-primitives/std",
+	"support/std",
+	"authorship/std",
+	"balances/std",
+	"contracts/std",
+	"elections/std",
+	"executive/std",
+	"finality-tracker/std",
+	"indices/std",
+	"membership/std",
+	"system/std",
+	"timestamp/std",
+	"treasury/std",
+	"sudo/std",
+	"version/std",
+	"hb-node-primitives/std",
+	"serde",
+	"safe-mix/std",
+	"client/std",
+	"rustc-hex",
+	"substrate-keyring",
+	"offchain-primitives/std",
+	"substrate-session/std",
+	"substrate-badger-rapi/std",
+	"srml-badger/std",
+	"srml-keygen/std",
+	"randomness-collective-flip/std",
+	"transaction-payment/std"
+
+]

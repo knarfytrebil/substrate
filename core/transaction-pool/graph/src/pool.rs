@@ -132,6 +132,7 @@ impl<B: ChainApi> Pool<B> {
 		self.verify(at, xts, force)
 			.map(move |validated_transactions| validated_transactions
 				.map(|validated_transactions| validated_pool.submit(validated_transactions)))
+
 	}
 
 	/// Imports one unverified extrinsic to the pool

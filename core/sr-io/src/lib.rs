@@ -29,7 +29,7 @@
 use rstd::vec::Vec;
 
 use primitives::{
-	crypto::KeyTypeId, ed25519, sr25519, H256,
+	crypto::KeyTypeId, ed25519, sr25519,hbbft_thresh,H256,
 	offchain::{
 		Timestamp, HttpRequestId, HttpRequestStatus, HttpError, StorageKind, OpaqueNetworkState,
 	},
@@ -180,6 +180,8 @@ export_api! {
 	pub(crate) trait CryptoApi {
 		/// Returns all ed25519 public keys for the given key id from the keystore.
 		fn ed25519_public_keys(id: KeyTypeId) -> Vec<ed25519::Public>;
+
+
 		/// Generate an ed22519 key for the given key type and store it in the keystore.
 		///
 		/// Returns the raw public key.
@@ -197,6 +199,16 @@ export_api! {
 		///
 		/// Returns `true` when the verification in successful.
 		fn ed25519_verify(sig: &ed25519::Signature, msg: &[u8], pubkey: &ed25519::Public) -> bool;
+
+
+		fn hb_node_generate(id: KeyTypeId, seed: Option<&str>) -> hbbft_thresh::Public;
+		
+		fn hb_node_sign(id: KeyTypeId,pubkey: &hbbft_thresh::Public,	msg: &[u8],) -> Option<hbbft_thresh::Signature>;
+       
+	    fn hb_node_public_keys(id: KeyTypeId) -> Vec<hbbft_thresh::Public>;
+
+     	fn hb_node_verify(sig: &hbbft_thresh::Signature, msg: &[u8], pubkey: &hbbft_thresh::Public) -> bool;
+
 
 		/// Returns all sr25519 public keys for the given key id from the keystore.
 		fn sr25519_public_keys(id: KeyTypeId) -> Vec<sr25519::Public>;

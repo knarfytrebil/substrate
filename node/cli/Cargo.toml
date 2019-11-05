@@ -63,6 +63,9 @@ serde = { version = "1.0.101", features = [ "derive" ] }
 client_db = { package = "substrate-client-db", path = "../../core/client/db", default-features = false }
 offchain = { package = "substrate-offchain", path = "../../core/offchain" }
 
+keygen = { package="substrate-keygen", path = "../../core/keygen" }
+sr-keygen = { package="srml-keygen", path = "../../srml/keygen"}
+futures03 = { package = "futures-preview", version = "=0.3.0-alpha.19", features = ["compat"] }
 # CLI-specific dependencies
 tokio = { version = "0.1.22", optional = true }
 exit-future = { version = "0.1.4", optional = true }

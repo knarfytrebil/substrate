@@ -83,6 +83,8 @@ where
 	}
 }
 
+
+
 /// The proposer logic.
 pub struct Proposer<Block: BlockT, C, A: txpool::ChainApi> {
 	client: Arc<C>,

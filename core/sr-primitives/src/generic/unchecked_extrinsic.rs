@@ -16,6 +16,9 @@
 
 //! Generic implementation of an unchecked (pre-verification) extrinsic.
 
+
+
+
 use rstd::prelude::*;
 use rstd::fmt;
 use runtime_io::blake2_256;
@@ -91,6 +94,9 @@ impl<Address, Call, Signature, Extra: SignedExtension> Extrinsic
 		})
 	}
 }
+
+
+
 
 impl<Address, AccountId, Call, Signature, Extra, Lookup>
 	Checkable<Lookup>

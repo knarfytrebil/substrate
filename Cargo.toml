@@ -1,6 +1,7 @@
 [workspace]
 members = [
-	"core/authority-discovery",
+	"dbg",
+	"nodehb/hbcli",
 	"core/application-crypto",
 	"core/chain-spec",
 	"core/chain-spec/derive",
@@ -73,7 +74,9 @@ members = [
 	"srml/finality-tracker",
 	"srml/generic-asset",
 	"srml/grandpa",
+	"srml/hbbft",
 	"srml/im-online",
+	"srml/keygen",
 	"srml/authority-discovery",
 	"srml/indices",
 	"srml/membership",
@@ -101,12 +104,11 @@ members = [
 	"node/rpc-client",
 	"node/runtime",
 	"node/testing",
-	"node-template",
-	"subkey",
+	# "node-template",
+	# "subkey",
 	"test-utils/chain-spec-builder",
 ]
 
 [profile.release]
 # Substrate runtime requires unwinding.
 panic = "unwind"
-

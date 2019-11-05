@@ -40,6 +40,11 @@ use rstd::{collections::btree_map::{BTreeMap, IntoIter, Entry}, vec::Vec};
 #[cfg(feature = "std")]
 use parking_lot::RwLock;
 
+
+//#[cfg(feature = "std")]
+//use log::info;
+
+
 #[cfg(feature = "std")]
 use std::{sync::Arc, format};
 
@@ -246,6 +251,7 @@ impl InherentDataProviders {
 		&self,
 		provider: P,
 	) -> Result<(), RuntimeString> {
+	//	info!("Register provider called {:?}",provider.inherent_identifier());
 		if self.has_provider(&provider.inherent_identifier()) {
 			Err(
 				format!(
@@ -255,6 +261,7 @@ impl InherentDataProviders {
 			)
 		} else {
 			provider.on_register(self)?;
+		//	info!("Register provider OK {:?}",provider.inherent_identifier());
 			self.providers.write().push(Box::new(provider));
 			Ok(())
 		}
@@ -269,6 +276,7 @@ impl InherentDataProviders {
 	pub fn create_inherent_data(&self) -> Result<InherentData, RuntimeString> {
 		let mut data = InherentData::new();
 		self.providers.read().iter().try_for_each(|p| {
+		//	info!("Inherent {:?} data ",&p.inherent_identifier());
 			p.provide_inherent_data(&mut data)
 				.map_err(|e| format!("Error for `{:?}`: {:?}", p.inherent_identifier(), e))
 		})?;

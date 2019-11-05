@@ -1,0 +1,52 @@
+{
+ "num_validators": 4,   
+ "batch_size":20,
+ "nodes":
+ {
+     "node1":
+       {
+        "node_id" :
+          {
+            "pub":  "b82350e921cfdd49fcf566925fa81dfcb14dda2573f581bf616e7bd43fa50b632797e8af87461a66549eef343c56fe77",
+            "priv": "25f3d0f30cf84f4966836f046f9a664b4480012cc3ff95ef99acede1bb64020d"
+            },
+        "secret_key_share": "d7b7974fa07c05be06b80723b399a4d2f2414378e5ebffdba9f7702e2b897f10"
+       },
+            "node2":
+       {
+        "node_id" :
+          {
+            "pub":  "a11199fe2856c3aedfe4953c34b3659abe11e26667824870650779f3876a2ec6c9b1737f3d25d79e63da41c1c8b80e48",
+            "priv": "c32f7ce08565655a904485aaab77e610c722abc33cc8355abec164fdb2708512"
+            },
+        "secret_key_share": "83f67c38a14e21f1e9d2ae0ecd3912c1fc953d8616eaa218eb5e76843769ae13"
+       },
+            "node3":
+       {
+        "node_id" :
+          {
+            "pub":  "9344604780aaa4a1f9340a4a855a3a031ee363f5fc546fbef440ac4026048f6de25a67020aa8be6c7ad6fbc9072721ad",
+            "priv": "14c2b37df80a1a61b19bf2d16fc7e641a2d656c0f84e4380b1849fdd34739f3a"
+            },
+        "secret_key_share": "2f356221a2203d24cded55fae6d97faf06ea379447e845552cc67bda4349dd16"
+       },
+            "node4":
+       {
+        "node_id" :
+          {
+            "pub":  "90f3fc0b7dd622200aa8db3840cb239c02cc10dc914644b7cd9bc072f22db28ce754c4f6aaad224984b5283452cc30fa",
+            "priv": "5a1a127301d856387c5e2aa278dec34d7f0b6fa4a8c7beee30eab6b38491d318"
+            },
+        "secret_key_share": "db73470aa3f25857b008fde5007aed9d103e32a278e6e8916d2d813050290c1a"
+       }
+ },
+ "public_key_set"   :"020000000000000098be69fc7042c39db9601f11bc93a402e9cdc7db672c15aa30051678c594ee78c3c5661ab66a7a39ec9019e8d882276192e84167a4fa0b858cc780617527aa0496062ca0b080813dbe04eab693e6a2973c5b8fcd6b511a94b7d079f5efd6b7e6",
+ "initial_validators": {
+     "QmcspA8oQvGgyZQ8PHEzaVgxhd8Bha3mbP8BkrTxxWrpZS":"a7e0d34473f63893f94094b08d40cc3f8185a52324cd12f5a8f6aea9409f0e6bf6a3632f7a64c8aee6d042e63fd4aeb2",
+     "Qmaga7CxmT18pZeaXHKxEc4wsj2cSK8BLhvY4hJ9bdRvAp":"a3e5c469092507548621be6130b617601f67f38db0d667da642161dbcce7df4f7623989e72a3ba499bc79e9342e5ef36",
+     "QmeihECXEHU4AVGMtLLyTixn9NjJeebLpEygK5RbESUKkR":"80bb6324349df554d8dc84288c4c816979d14982b4ae20a7b759ddfe88f2dd494484ca8c5d0e230c0aa377008ac86c5a",
+     "QmXvFpA699WscGfH4xucw8RLcqxmzzCjacx9fE5NDQz1A6":"92821a8e4b996e00ed772bb00481f217630b608a014879dbaffc55df90d04c5395f8ce2ef35d1beec4fed2e839a66c64"
+     
+     }
+}
+

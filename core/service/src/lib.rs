@@ -39,6 +39,7 @@ use parking_lot::Mutex;
 use client::{runtime_api::BlockT, Client};
 use exit_future::Signal;
 use futures::prelude::*;
+
 use futures03::{
 	future::{ready, FutureExt as _, TryFutureExt as _},
 	stream::{StreamExt as _, TryStreamExt as _},
@@ -47,7 +48,7 @@ use network::{
 	NetworkService, NetworkState, specialization::NetworkSpecialization,
 	Event, DhtEvent, PeerId, ReportHandle,
 };
-use log::{log, warn, debug, error, Level};
+use log::{log, warn, debug, error, Level,info};
 use codec::{Encode, Decode};
 use primitives::{Blake2Hasher, H256};
 use sr_primitives::generic::BlockId;
@@ -98,6 +99,8 @@ pub struct Service<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> {
 	/// If spawning a background task is not possible, we instead push the task into this `Vec`.
 	/// The elements must then be polled manually.
 	to_poll: Vec<Box<dyn Future<Item = (), Error = ()> + Send>>,
+	/// Configuration of this Service
+	//config: TCfg,
 	rpc_handlers: rpc_servers::RpcHandler<rpc::Metadata>,
 	_rpc: Box<dyn std::any::Any + Send + Sync>,
 	_telemetry: Option<tel::Telemetry>,
@@ -132,6 +135,7 @@ impl Executor<Box<dyn Future<Item = (), Error = ()> + Send>> for SpawnTaskHandle
 		}
 	}
 }
+	
 
 macro_rules! new_impl {
 	(
@@ -529,6 +533,7 @@ pub trait AbstractService: 'static + Future<Item = (), Error = Error> +
 	fn on_exit(&self) -> ::exit_future::Exit;
 }
 
+
 impl<TBl, TBackend, TExec, TRtApi, TSc, TNetSpec, TExPoolApi, TOc> AbstractService for
 	Service<TBl, Client<TBackend, TExec, TBl, TRtApi>, TSc, NetworkStatus<TBl>,
 		NetworkService<TBl, TNetSpec, H256>, TransactionPool<TExPoolApi>, TOc>
@@ -711,6 +716,7 @@ fn build_network_future<
 			last = Some(item);
 		}
 		if let Some(notification) = last {
+			info!("FINALIZED");
 			network.on_block_finalized(notification.hash, notification.header);
 		}
 

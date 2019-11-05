@@ -348,6 +348,10 @@ pub mod ext {
 		/// in `out`.
 		fn ext_ed25519_generate(id: *const u8, seed: *const u8, seed_len: u32, out: *mut u8);
 
+		/// Generate an `HBBFT node` key pair for the given key type id and store the public key
+		/// in `out`.
+		fn ext_hb_node_generate(id: *const u8, seed: *const u8, seed_len: u32, out: *mut u8);
+
 		/// Sign the given `msg` with the `ed25519` key pair that corresponds to then given key
 		/// type id and public key. The raw signature is stored in `out`.
 		///
@@ -356,6 +360,35 @@ pub mod ext {
 		/// - `0` on success
 		/// - nonezero if something failed, e.g. retrieving of the key.
 		fn ext_ed25519_sign(
+			id: *const u8,
+			pubkey: *const u8,
+			msg: *const u8,
+			msg_len: u32,
+			out: *mut u8,
+		) -> u32;
+
+    	/// Generate an `HBBFT node` key pair for the given key type id and store the public key
+		/// in `out`.
+		fn ext_hb_node_public_keys(id: *const u8, result_len: *mut u32) -> *mut u8;
+
+	/// Note: `ext_hb_node_verify` returns 0 if the signature is correct, nonzero otherwise.
+		fn ext_hb_node_verify(
+			msg_data: *const u8,
+			msg_len: u32,
+			sig_data: *const u8,
+			pubkey_data: *const u8,
+		) -> u32;
+
+
+
+		/// Sign the given `msg` with the `sr25519` key pair that corresponds to then given key
+		/// type id and public key. The raw signature is stored in `out`.
+		///
+		/// # Returns
+		///
+		/// - `0` on success
+		/// - nonezero if something failed, e.g. retrieving of the key.
+		fn ext_hb_node_sign(
 			id: *const u8,
 			pubkey: *const u8,
 			msg: *const u8,
@@ -876,6 +909,15 @@ impl CryptoApi for () {
 		}
 	}
 
+	fn hb_node_public_keys(id: KeyTypeId) -> Vec<hbbft_thresh::Public> {
+		let mut res_len = 0u32;
+		unsafe {
+			let res_ptr = ext_hb_node_public_keys.get()(id.0.as_ptr(), &mut res_len);
+			Vec::decode(&mut rstd::slice::from_raw_parts(res_ptr, res_len as usize)).unwrap_or_default()
+		}
+	}
+
+
 	fn ed25519_generate(id: KeyTypeId, seed: Option<&str>) -> ed25519::Public {
 		let mut res = [0u8; 32];
 		let seed = seed.as_ref().map(|s| s.as_bytes()).unwrap_or(&[]);
@@ -884,6 +926,39 @@ impl CryptoApi for () {
 		};
 		ed25519::Public(res)
 	}
+	fn hb_node_generate(id: KeyTypeId, seed: Option<&str>) -> hbbft_thresh::Public {
+		let mut res = [0u8; hbbft_thresh::PK_SIZE];
+		let seed = seed.as_ref().map(|s| s.as_bytes()).unwrap_or(&[]);
+		unsafe {
+			ext_hb_node_generate.get()(id.0.as_ptr(), seed.as_ptr(), seed.len() as u32, res.as_mut_ptr())
+		};
+		hbbft_thresh::Public(res)
+	}
+
+	fn hb_node_sign(
+		id: KeyTypeId,
+		pubkey: &hbbft_thresh::Public,
+		msg: &[u8],
+	) -> Option<hbbft_thresh::Signature> {
+		let mut res = [0u8; hbbft_thresh::SIG_SIZE];
+		let success = unsafe {
+			ext_hb_node_sign.get()(
+				id.0.as_ptr(),
+				pubkey.0.as_ptr(),
+				msg.as_ref().as_ptr(),
+				msg.as_ref().len() as u32,
+				res.as_mut_ptr(),
+			) == 0
+		};
+
+		if success {
+			Some(hbbft_thresh::Signature(res))
+		} else {
+			None
+		}
+	}
+
+
 
 	fn ed25519_sign(
 		id: KeyTypeId,
@@ -911,6 +986,17 @@ impl CryptoApi for () {
 	fn ed25519_verify(sig: &ed25519::Signature, msg: &[u8], pubkey: &ed25519::Public) -> bool {
 		unsafe {
 			ext_ed25519_verify.get()(
+				msg.as_ptr(),
+				msg.len() as u32,
+				sig.0.as_ptr(),
+				pubkey.0.as_ptr(),
+			) == 0
+		}
+	}
+
+	fn hb_node_verify(sig: &hbbft_thresh::Signature, msg: &[u8], pubkey: &hbbft_thresh::Public) -> bool {
+		unsafe {
+			ext_hb_node_verify.get()(
 				msg.as_ptr(),
 				msg.len() as u32,
 				sig.0.as_ptr(),

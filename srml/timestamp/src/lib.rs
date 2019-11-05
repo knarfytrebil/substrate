@@ -90,16 +90,21 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use rstd::{result, cmp};
+use rstd::{result, cmp,vec::Vec};
 use codec::Encode;
 #[cfg(feature = "std")]
 use codec::Decode;
 #[cfg(feature = "std")]
 use inherents::ProvideInherentData;
+
+#[cfg(feature = "std")]
+use log::info;
+
+
 use support::{Parameter, decl_storage, decl_module};
 use support::traits::{Time, Get};
 use sr_primitives::traits::{
-	SimpleArithmetic, Zero, SaturatedConversion, Scale
+	SimpleArithmetic,  SaturatedConversion, Scale
 };
 use sr_primitives::weights::SimpleDispatchInfo;
 use system::ensure_none;
@@ -111,8 +116,8 @@ pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"timstap0";
 pub type InherentType = u64;
 
 /// Errors that can occur while checking the timestamp inherent.
-#[derive(Encode, sr_primitives::RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Decode))]
+#[derive(Encode)]
+#[cfg_attr(feature = "std", derive(Debug, Decode))]
 pub enum InherentError {
 	/// The timestamp is valid in the future.
 	/// This is a non-fatal-error and will not stop checking the inherents.
@@ -166,7 +171,7 @@ impl ProvideInherentData for InherentDataProvider {
 
 	fn provide_inherent_data(&self, inherent_data: &mut InherentData) -> Result<(), RuntimeString> {
 		use std::time::SystemTime;
-
+        info!("Providing");
 		let now = SystemTime::now();
 		now.duration_since(SystemTime::UNIX_EPOCH)
 			.map_err(|_| {
@@ -224,19 +229,37 @@ decl_module! {
 		#[weight = SimpleDispatchInfo::FixedOperational(10_000)]
 		fn set(origin, #[compact] now: T::Moment) {
 			ensure_none(origin)?;
-			assert!(!<Self as Store>::DidUpdate::exists(), "Timestamp must be updated only once in the block");
-			assert!(
-				Self::now().is_zero() || now >= Self::now() + T::MinimumPeriod::get(),
-				"Timestamp must increment by at least <MinimumPeriod> between sequential blocks"
-			);
-			<Self as Store>::Now::put(now);
-			<Self as Store>::DidUpdate::put(true);
+			//assert!(!<Self as Store>::DidUpdate::exists(), "Timestamp must be updated only once in the block");
+			//assert!(
+		//		Self::now().is_zero() || now >= Self::now() + T::MinimumPeriod::get(),
+		//		"Timestamp must increment by at least <MinimumPeriod> between sequential blocks"
+		//	);
+		    let mut cvar=<Self as Store>::Variants::get();
+             cvar.push(now);
+			<Self as Store>::Variants::put(cvar);
+		//	<Self as Store>::DidUpdate::put(true);
 
 			<T::OnTimestampSet as OnTimestampSet<_>>::on_timestamp_set(now);
 		}
 
 		fn on_finalize() {
-			assert!(<Self as Store>::DidUpdate::take(), "Timestamp must be updated once in the block");
+			let mut cvar=<Self as Store>::Variants::take();
+			if cvar.len()==0
+			{
+				return;
+			}
+
+			cvar.sort();
+		
+			let mid = cvar.len() / 2;
+			let newnow=cvar[mid];
+			let nowpt=<Self as Store>::Now::get();
+			if newnow>nowpt
+			{
+			<Self as Store>::Now::put(newnow);
+			}
+
+			//assert!(<Self as Store>::DidUpdate::take(), "Timestamp must be updated once in the block");
 		}
 	}
 }
@@ -244,8 +267,8 @@ decl_module! {
 decl_storage! {
 	trait Store for Module<T: Trait> as Timestamp {
 		/// Current time for the current block.
-		pub Now get(fn now) build(|_| 0.into()): T::Moment;
-
+		pub Now get(now) build(|_| 0.into()): T::Moment;
+        pub Variants get(variants)  build(|_| Vec::new()): Vec<T::Moment>;
 		/// Did the timestamp get updated in this block?
 		DidUpdate: bool;
 	}
@@ -268,9 +291,18 @@ impl<T: Trait> Module<T> {
 }
 
 fn extract_inherent_data(data: &InherentData) -> Result<InherentType, RuntimeString> {
-	data.get_data::<InherentType>(&INHERENT_IDENTIFIER)
+	// lock out for now?
+	/*data.get_data::<InherentType>(&INHERENT_IDENTIFIER)
 		.map_err(|_| RuntimeString::from("Invalid timestamp inherent data encoding."))?
-		.ok_or_else(|| "Timestamp inherent data is not provided.".into())
+		.ok_or_else(|| "Timestamp inherent data is not provided.".into()) */
+		match data.get_data::<InherentType>(&INHERENT_IDENTIFIER)
+		{
+			Ok(Some(val) )=> Ok(val),
+			Ok(None) => Ok(0),
+			Err(_) => Ok(0)
+		}
+		//.map_err(|_| RuntimeString::from("Invalid timestamp inherent data encoding."))?
+		//.ok_or_else(|| "Timestamp inherent data is not provided.".into()) 
 }
 
 impl<T: Trait> ProvideInherent for Module<T> {
@@ -348,6 +380,7 @@ mod tests {
 		type AccountId = u64;
 		type Lookup = IdentityLookup<Self::AccountId>;
 		type Header = Header;
+		type WeightMultiplierUpdate = ();
 		type Event = ();
 		type BlockHashCount = BlockHashCount;
 		type MaximumBlockWeight = MaximumBlockWeight;

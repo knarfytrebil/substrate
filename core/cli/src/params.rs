@@ -159,6 +159,11 @@ pub struct NetworkConfigurationParams {
 	/// local network. This disables it. Automatically implied when using --dev.
 	#[structopt(long = "no-mdns")]
 	pub no_mdns: bool,
+	
+	#[structopt(long = "no-propagate")]
+	pub dont_propagate_extr: bool,
+
+
 
 	#[allow(missing_docs)]
 	#[structopt(flatten)]
@@ -416,6 +421,10 @@ pub struct RunCmd {
 	/// The node name will be reported to the telemetry server, if enabled.
 	#[structopt(long = "name", value_name = "NAME")]
 	pub name: Option<String>,
+
+
+    #[structopt(long = "node-conf-file", value_name = "NODE_CONF_FILE")]
+	pub nconffile: Option<String>,
 
 	/// Disable connecting to the Substrate telemetry server.
 	///

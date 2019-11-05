@@ -1,0 +1,55 @@
+[package]
+name = "substrate-badger-mushroom"
+version = "2.0.0"
+authors = ["Not me"]
+edition = "2018"
+
+[dependencies]
+futures-timer = "0.3.0"
+bytes = "0.4.12"
+unsigned-varint = { version = "0.2.2", features = ["codec"] }
+fork-tree = { path = "../../core/utils/fork-tree" }
+futures03 = { package = "futures-preview", version = "0.3.0-alpha.19", features = ["compat"] }
+log = "0.4"
+parking_lot = "0.8.0"
+tokio-executor = "0.1.7"
+tokio-timer = "0.2.11"
+rand = "0.6"
+hex_fmt = "0.3.0"
+parity-codec = { package = "parity-scale-codec", version = "1.0.0", features = ["derive"] }
+runtime_primitives = { package = "sr-primitives", path = "../sr-primitives" }
+consensus_common = { package = "substrate-consensus-common", path = "../consensus/common" }
+substrate-primitives = { path = "../primitives" }
+substrate-telemetry = { path = "../telemetry" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+client = { package = "substrate-client", path = "../client" }
+inherents = { package = "substrate-inherents", path = "../../core/inherents" }
+network = { package = "substrate-network", path = "../network", features = ["upgraded"] }
+keystore = { package = "substrate-keystore", path = "../keystore" }
+service = { package = "substrate-service", path = "../service", optional = true }
+srml-finality-tracker = { path = "../../srml/finality-tracker" }
+badger_primitives = { package = "substrate-badger-primitives", path = "primitives" }
+substrate-badger-rapi = { package="substrate-badger-rapi", path="runtime_api"}
+hex = "0.3.2"
+badger = { package= "hbbft", path="../../../hbbft" }
+bincode = "1.0.1"
+transaction_pool = { package = "substrate-transaction-pool", path = "../../core/transaction-pool" }
+num = { package = "num-traits", version = "0.2", default-features = false }
+libp2p = { version = "0.11.0", default-features = false, features = ["secp256k1", "libp2p-websocket"] }
+srml-timestamp = { path = "../../srml/timestamp" }
+serde_bytes = "0.11"
+derive_more = "0.15"
+
+[dev-dependencies]
+grandpa = { package = "finality-grandpa", version = "0.8.1", features = ["derive-codec", "test-helpers"] }
+network = { package = "substrate-network", path = "../network", features = ["test-helpers"] }
+keyring = { package = "substrate-keyring", path = "../keyring" }
+test-client = { package = "substrate-test-runtime-client", path = "../test-runtime/client"}
+env_logger = "0.6"
+tokio = "0.1.17"
+
+
+[features]
+default = ["service-integration"]
+service-integration = ["service"]

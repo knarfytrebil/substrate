@@ -106,7 +106,7 @@ impl<TSubstream> DiscoveryBehaviour<TSubstream> {
 		for (peer_id, addr) in &user_defined {
 			kademlia.add_address(peer_id, addr.clone());
 		}
-
+        println!("{:?}", local_public_key.clone().into_peer_id());
 		DiscoveryBehaviour {
 			user_defined,
 			kademlia,

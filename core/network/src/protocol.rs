@@ -997,7 +997,7 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 		if self.sync.status().state != SyncState::Idle {
 			return;
 		}
-
+        debug!(target: "sync", "Propagating extrinsics: syncstate idle");
 		let extrinsics = self.transaction_pool.transactions();
 		let mut propagated_to = HashMap::new();
 		for (who, peer) in self.context_data.peers.iter_mut() {
