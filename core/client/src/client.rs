@@ -114,7 +114,6 @@ impl Default for ExecutionStrategies {
 			syncing: ExecutionStrategy::NativeElseWasm,
 			importing: ExecutionStrategy::NativeElseWasm,
 			block_construction: ExecutionStrategy::AlwaysWasm,
-		//	block_construction: ExecutionStrategy::NativeWhenPossible,
 			offchain_worker: ExecutionStrategy::NativeWhenPossible,
 			other: ExecutionStrategy::NativeElseWasm,
 		}
@@ -498,7 +497,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 	/// Get longest range within [first; last] that is possible to use in `key_changes`
 	/// and `key_changes_proof` calls.
 	/// Range could be shortened from the beginning if some changes tries have been pruned.
-	/// Returns Ok(None) if changes trues are not supported.
+	/// Returns Ok(None) if changes tries are not supported.
 	pub fn max_key_changes_range(
 		&self,
 		first: NumberFor<Block>,
@@ -633,6 +632,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			) -> bool {
 				self.storage.with_cached_changed_keys(root, functor)
 			}
+
 			fn get(&self, key: &H256, prefix: Prefix) -> Result<Option<DBValue>, String> {
 				self.storage.get(key, prefix)
 			}
@@ -838,15 +838,22 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			finalized,
 			auxiliary,
 			fork_choice,
+			allow_missing_state,
 		} = import_block;
 
 		assert!(justification.is_some() && finalized || justification.is_none());
 
 		let parent_hash = header.parent_hash().clone();
+		let mut enact_state = true;
 
-		match self.backend.blockchain().status(BlockId::Hash(parent_hash))? {
-			blockchain::BlockStatus::InChain => {},
-			blockchain::BlockStatus::Unknown => return Ok(ImportResult::UnknownParent),
+		match self.block_status(&BlockId::Hash(parent_hash))? {
+			BlockStatus::Unknown => return Ok(ImportResult::UnknownParent),
+			BlockStatus::InChainWithState | BlockStatus::Queued => {},
+			BlockStatus::InChainPruned if allow_missing_state => {
+				enact_state = false;
+			},
+			BlockStatus::InChainPruned => return Ok(ImportResult::MissingState),
+			BlockStatus::KnownBad => return Ok(ImportResult::KnownBad),
 		}
 
 		let import_headers = if post_digests.is_empty() {
@@ -875,15 +882,16 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			finalized,
 			auxiliary,
 			fork_choice,
+			enact_state,
 		);
 
 		if let Ok(ImportResult::Imported(ref aux)) = result {
 			if aux.is_new_best {
-		telemetry!(SUBSTRATE_INFO; "block.import";
-			"height" => height,
-			"best" => ?hash,
-			"origin" => ?origin
-		);
+				telemetry!(SUBSTRATE_INFO; "block.import";
+					"height" => height,
+					"best" => ?hash,
+					"origin" => ?origin
+				);
 			}
 		}
 
@@ -902,6 +910,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		finalized: bool,
 		aux: Vec<(Vec<u8>, Option<Vec<u8>>)>,
 		fork_choice: ForkChoiceStrategy,
+		enact_state: bool,
 	) -> error::Result<ImportResult> where
 		E: CallExecutor<Block, Blake2Hasher> + Send + Sync + Clone,
 	{
@@ -916,7 +925,6 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		// the block is lower than our last finalized block so it must revert
 		// finality, refusing import.
 		if *import_headers.post().number() <= info.finalized_number {
-			info!("Number mismatch {:?}",import_headers.post().number());
 			return Err(error::Error::NotInFinalizedChain);
 		}
 
@@ -928,23 +936,41 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			BlockOrigin::Genesis | BlockOrigin::NetworkInitialSync | BlockOrigin::File => false,
 		};
 
-		self.backend.begin_state_operation(&mut operation.op, BlockId::Hash(parent_hash))?;
+		let storage_changes = match &body {
+			Some(body) if enact_state => {
+				self.backend.begin_state_operation(&mut operation.op, BlockId::Hash(parent_hash))?;
 
-		// ensure parent block is finalized to maintain invariant that
-		// finality is called sequentially.
-		if finalized {
-			self.apply_finality_with_block_hash(operation, parent_hash, None, info.best_hash, make_notifications)?;
-		}
+				// ensure parent block is finalized to maintain invariant that
+				// finality is called sequentially.
+				if finalized {
+					self.apply_finality_with_block_hash(operation, parent_hash, None, info.best_hash, make_notifications)?;
+				}
 
-		// FIXME #1232: correct path logic for when to execute this function
-		let (storage_update, changes_update, storage_changes) = self.block_execution(
-			&operation.op,
-			&import_headers,
-			origin,
-			hash,
-			body.clone(),
-		)?;
-        let is_new_best = finalized || match fork_choice {
+				// FIXME #1232: correct path logic for when to execute this function
+				let (storage_update, changes_update, storage_changes) = self.block_execution(
+					&operation.op,
+					&import_headers,
+					origin,
+					hash,
+					&body,
+				)?;
+
+				operation.op.update_cache(new_cache);
+				if let Some(storage_update) = storage_update {
+					operation.op.update_db_storage(storage_update)?;
+				}
+				if let Some(storage_changes) = storage_changes.clone() {
+					operation.op.update_storage(storage_changes.0, storage_changes.1)?;
+				}
+				if let Some(Some(changes_update)) = changes_update {
+					operation.op.update_changes_trie(changes_update)?;
+				}
+				storage_changes
+			},
+			_ => None,
+		};
+
+		let is_new_best = finalized || match fork_choice {
 			ForkChoiceStrategy::LongestChain => import_headers.post().number() > &info.best_number,
 			ForkChoiceStrategy::Custom(v) => v,
 		};
@@ -967,6 +993,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		} else {
 			Vec::default()
 		};
+
 		trace!("Imported {}, (#{}), best={}, origin={:?}", hash, import_headers.post().number(), is_new_best, origin);
 
 		operation.op.set_block_data(
@@ -975,19 +1002,6 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			justification,
 			leaf_state,
 		)?;
-
-		operation.op.update_cache(new_cache);
-		if let Some(storage_update) = storage_update {
-			         info!("storage_update ");
-		
-			operation.op.update_db_storage(storage_update)?;
-		}
-		if let Some(storage_changes) = storage_changes.clone() {
-			operation.op.update_storage(storage_changes.0, storage_changes.1)?;
-		}
-		if let Some(Some(changes_update)) = changes_update {
-			operation.op.update_changes_trie(changes_update)?;
-		}
 
 		operation.op.insert_aux(aux)?;
 
@@ -1015,7 +1029,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		import_headers: &PrePostHeader<Block::Header>,
 		origin: BlockOrigin,
 		hash: Block::Hash,
-		body: Option<Vec<Block::Extrinsic>>,
+		body: &[Block::Extrinsic],
 	) -> error::Result<(
 		Option<StorageUpdate<B, Block>>,
 		Option<Option<ChangesUpdate<Block>>>,
@@ -1034,7 +1048,6 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 					match execution_strategy {
 						ExecutionStrategy::NativeElseWasm => ExecutionManager::NativeElseWasm,
 						ExecutionStrategy::AlwaysWasm => ExecutionManager::AlwaysWasm(BackendTrustLevel::Trusted),
-					//	ExecutionStrategy::AlwaysWasm => ExecutionManager::NativeWhenPossible,
 						ExecutionStrategy::NativeWhenPossible => ExecutionManager::NativeWhenPossible,
 						ExecutionStrategy::Both => ExecutionManager::Both(|wasm_result, native_result| {
 							let header = import_headers.post();
@@ -1054,7 +1067,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 
 				let encoded_block = <Block as BlockT>::encode_from(
 					import_headers.pre(),
-					&body.unwrap_or_default()
+					body,
 				);
 
 				let (_, storage_update, changes_update) = self.executor
@@ -1525,7 +1538,7 @@ impl<'a, B, E, Block, RA> consensus::BlockImport<Block> for &'a Client<B, E, Blo
 		&mut self,
 		block: BlockCheckParams<Block>,
 	) -> Result<ImportResult, Self::Error> {
-		let BlockCheckParams { hash, number, parent_hash } = block;
+		let BlockCheckParams { hash, number, parent_hash, allow_missing_state } = block;
 
 		if let Some(h) = self.fork_blocks.as_ref().and_then(|x| x.get(&number)) {
 			if &hash != h  {
@@ -1543,7 +1556,9 @@ impl<'a, B, E, Block, RA> consensus::BlockImport<Block> for &'a Client<B, E, Blo
 			.map_err(|e| ConsensusError::ClientImport(e.to_string()))?
 		{
 			BlockStatus::InChainWithState | BlockStatus::Queued => {},
-			BlockStatus::Unknown | BlockStatus::InChainPruned => return Ok(ImportResult::UnknownParent),
+			BlockStatus::Unknown => return Ok(ImportResult::UnknownParent),
+			BlockStatus::InChainPruned if allow_missing_state => {},
+			BlockStatus::InChainPruned => return Ok(ImportResult::MissingState),
 			BlockStatus::KnownBad => return Ok(ImportResult::KnownBad),
 		}
 
@@ -1554,7 +1569,6 @@ impl<'a, B, E, Block, RA> consensus::BlockImport<Block> for &'a Client<B, E, Blo
 			BlockStatus::Unknown | BlockStatus::InChainPruned => {},
 			BlockStatus::KnownBad => return Ok(ImportResult::KnownBad),
 		}
-
 
 		Ok(ImportResult::imported(false))
 	}
@@ -1583,7 +1597,7 @@ impl<B, E, Block, RA> consensus::BlockImport<Block> for Client<B, E, Block, RA> 
 	}
 }
 
-impl<B, E, Block, RA> Finalizer<Block, Blake2Hasher, B> for Client<B, E, Block, RA> where 
+impl<B, E, Block, RA> Finalizer<Block, Blake2Hasher, B> for Client<B, E, Block, RA> where
 	B: backend::Backend<Block, Blake2Hasher>,
 	E: CallExecutor<Block, Blake2Hasher>,
 	Block: BlockT<Hash=H256>,
@@ -1607,7 +1621,7 @@ impl<B, E, Block, RA> Finalizer<Block, Blake2Hasher, B> for Client<B, E, Block, 
 	}
 }
 
-impl<B, E, Block, RA> Finalizer<Block, Blake2Hasher, B> for &Client<B, E, Block, RA> where 
+impl<B, E, Block, RA> Finalizer<Block, Blake2Hasher, B> for &Client<B, E, Block, RA> where
 	B: backend::Backend<Block, Blake2Hasher>,
 	E: CallExecutor<Block, Blake2Hasher>,
 	Block: BlockT<Hash=H256>,
@@ -1774,7 +1788,7 @@ impl<B, E, Block, RA> backend::AuxStore for &Client<B, E, Block, RA>
 		B: backend::Backend<Block, Blake2Hasher>,
 		E: CallExecutor<Block, Blake2Hasher>,
 		Block: BlockT<Hash=H256>,
-{ 
+{
 
 	fn insert_aux<
 		'a,

@@ -21,29 +21,34 @@
 use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
 
-use parity_codec::{Encode, Decode};
+use codec::{Encode, Decode};
 use keyring::sr25519::Keyring;
-use hb_node_runtime::{Call, CheckedExtrinsic, UncheckedExtrinsic, SignedExtra, BalancesCall, ExistentialDeposit};
+use hb_node_runtime::{
+	Call, CheckedExtrinsic, UncheckedExtrinsic, SignedExtra, BalancesCall, ExistentialDeposit,
+	MinimumPeriod
+};
+use hb_node_primitives::Signature;
 use primitives::{sr25519, crypto::Pair};
-use sr_primitives::{generic::Era, traits::{Block as BlockT, Header as HeaderT, SignedExtension}};
+use sr_primitives::{
+	generic::Era, traits::{Block as BlockT, Header as HeaderT, SignedExtension, Verify, IdentifyAccount}
+};
 use transaction_factory::RuntimeAdapter;
 use transaction_factory::modes::Mode;
 use inherents::InherentData;
 use timestamp;
 use finality_tracker;
 
-// TODO get via api: <T as timestamp::Trait>::MinimumPeriod::get(). See #2587.
-const MINIMUM_PERIOD: u64 = 99;
+type AccountPublic = <Signature as Verify>::Signer;
 
 pub struct FactoryState<N> {
 	block_no: N,
 
 	mode: Mode,
-	start_number: u64,
-	rounds: u64,
-	round: u64,
-	block_in_round: u64,
-	num: u64,
+	start_number: u32,
+	rounds: u32,
+	round: u32,
+	block_in_round: u32,
+	num: u32,
 }
 
 type Number = <<hb_node_primitives::Block as BlockT>::Header as HeaderT>::Number;
@@ -56,7 +61,7 @@ impl<Number> FactoryState<Number> {
 			system::CheckEra::from(Era::mortal(256, phase)),
 			system::CheckNonce::from(index),
 			system::CheckWeight::new(),
-		    transaction_payment::ChargeTransactionPayment::from(0),
+			transaction_payment::ChargeTransactionPayment::from(0),
 			Default::default(),
 		)
 	}
@@ -79,9 +84,9 @@ impl RuntimeAdapter for FactoryState<Number> {
 	) -> FactoryState<Self::Number> {
 		FactoryState {
 			mode,
-			num: num as u64,
+			num: num as u32,
 			round: 0,
-			rounds: rounds as u64,
+			rounds: rounds as u32,
 			block_in_round: 0,
 			block_no: 0,
 			start_number: 0,
@@ -93,23 +98,23 @@ impl RuntimeAdapter for FactoryState<Number> {
 	}
 
 	fn block_in_round(&self) -> Self::Number {
-		self.block_in_round
+		self.block_in_round as  Self::Number 
 	}
 
 	fn rounds(&self) -> Self::Number {
-		self.rounds
+		self.rounds as Self::Number
 	}
 
 	fn num(&self) -> Self::Number {
-		self.num
+		self.num as Self::Number
 	}
 
 	fn round(&self) -> Self::Number {
-		self.round
+		self.round as Self::Number
 	}
 
 	fn start_number(&self) -> Self::Number {
-		self.start_number
+		self.start_number as Self::Number
 	}
 
 	fn mode(&self) -> &Mode {
@@ -121,14 +126,14 @@ impl RuntimeAdapter for FactoryState<Number> {
 	}
 
 	fn set_block_in_round(&mut self, val: Self::Number) {
-		self.block_in_round = val;
+		self.block_in_round = val as u32;
 	}
 
 	fn set_round(&mut self, val: Self::Number) {
-		self.round = val;
+		self.round = val as u32;
 	}
 
-fn transfer_extrinsic(
+	fn transfer_extrinsic(
 		&self,
 		sender: &Self::AccountId,
 		key: &Self::Secret,
@@ -152,7 +157,7 @@ fn transfer_extrinsic(
 	}
 
 	fn inherent_extrinsics(&self) -> InherentData {
-		let timestamp = self.block_no as u64 * MINIMUM_PERIOD;
+		let timestamp = (self.block_no as u64 + 1) * MinimumPeriod::get();
 
 		let mut inherent = InherentData::new();
 		inherent.put_data(timestamp::INHERENT_IDENTIFIER, &timestamp)
@@ -163,12 +168,11 @@ fn transfer_extrinsic(
 	}
 
 	fn minimum_balance() -> Self::Balance {
-		// TODO get correct amount via api. See #2587.
 		ExistentialDeposit::get()
 	}
 
 	fn master_account_id() -> Self::AccountId {
-		Keyring::Alice.pair().public()
+		Keyring::Alice.to_account_id()
 	}
 
 	fn master_account_secret() -> Self::Secret {
@@ -177,13 +181,13 @@ fn transfer_extrinsic(
 
 	/// Generates a random `AccountId` from `seed`.
 	fn gen_random_account_id(seed: &Self::Number) -> Self::AccountId {
-		let pair: sr25519::Pair = sr25519::Pair::from_seed(&gen_seed_bytes(*seed));
-		pair.public().into()
+		let pair: sr25519::Pair = sr25519::Pair::from_seed(&gen_seed_bytes(*seed as u32));
+		AccountPublic::from(pair.public()).into_account()
 	}
 
 	/// Generates a random `Secret` from `seed`.
 	fn gen_random_account_secret(seed: &Self::Number) -> Self::Secret {
-		let pair: sr25519::Pair = sr25519::Pair::from_seed(&gen_seed_bytes(*seed));
+		let pair: sr25519::Pair = sr25519::Pair::from_seed(&gen_seed_bytes(*seed as u32));
 		pair
 	}
 
@@ -221,7 +225,7 @@ fn transfer_extrinsic(
 	}
 }
 
-fn gen_seed_bytes(seed: u64) -> [u8; 32] {
+fn gen_seed_bytes(seed: u32) -> [u8; 32] {
 	let mut rng: StdRng = SeedableRng::seed_from_u64(seed as u64);
 
 	let mut seed_bytes = [0u8; 32];
@@ -243,7 +247,7 @@ fn sign<RA: RuntimeAdapter>(
 			let payload = (xt.function, extra.clone(), additional_signed);
 			let signature = payload.using_encoded(|b| {
 				if b.len() > 256 {
-					key.sign(&sr_io::blake2_256(b))
+					key.sign(&sr_io::hashing::blake2_256(b))
 				} else {
 					key.sign(b)
 				}

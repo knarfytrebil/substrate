@@ -6,7 +6,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 use serde::Serialize;
 
-use codec::{Codec, Decode, Encode, Error as CodecError, Input};
+use codec::{ Decode, Encode,  }; //Codec Input Error as CodecError,
 use client::decl_runtime_apis;
 use rstd::vec::Vec;
 use sr_primitives::ConsensusEngineId;
@@ -62,7 +62,7 @@ impl ConsensusLog  {
 	pub fn try_into_vec(self) -> Option< (u64,Vec<u8>) > {
 		match self {
 			ConsensusLog::RequestForKeygen( ( id,change) ) => Some((id,change)),
-			_ => None,
+			//_ => None,
 		}
 	}
 

@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 //#![feature(async_closure)]
+=======
+>>>>>>> ada6eea5c70dc89ce34688fcb25b40a720010a39
 
 use client::backend::OffchainStorage;
 use primitives::offchain::StorageKind;
@@ -185,13 +188,13 @@ use mpe_primitives::MAIN_DB_PREFIX;
 pub const STORAGE_PREFIX: &[u8] = b"storage";
 use primitives::crypto::Public;
 use mpe_primitives::{get_data_prefix,get_key_prefix,get_complete_list_prefix,RequestId};
-impl<B, E, Block: BlockT, N: Network<Block>, RA,Storage> Environment<B, E, Block, N, RA,Storage> 
+impl<B, E, Block: BlockT, N: Network<Block>, RA,Storage> Environment<B, E, Block, N, RA,Storage>
 where Storage:OffchainStorage
 {
 	pub fn set_request_data(&self,request_id:RequestId,request_data:&[u8])
 	{
 		let  key:Vec<u8>=get_data_prefix(request_id);
-		self.local_storage_set(StorageKind::PERSISTENT, &key, request_data)   
+		self.local_storage_set(StorageKind::PERSISTENT, &key, request_data)
 	}
     pub fn set_request_complete(&self,request_id:RequestId) ->Result<(),&'static str>
 	{
@@ -233,7 +236,7 @@ where Storage:OffchainStorage
 			return Err("Can only set key/fail once per request")
 		}
 		let fail=[255u8;1];
-		
+
 		self.local_storage_set(StorageKind::PERSISTENT, &key, &fail) ;
 		self.set_request_complete(request_id)?;
 
@@ -247,7 +250,7 @@ where Storage:OffchainStorage
 			StorageKind::LOCAL => {},
 		}
 	}
-	pub fn local_storage_get(&self,  key: &[u8]) -> Option<Vec<u8>> 
+	pub fn local_storage_get(&self,  key: &[u8]) -> Option<Vec<u8>>
 	{
 			self.offchain.read().get(STORAGE_PREFIX, key)
 	}
@@ -456,7 +459,7 @@ where
 						  Ok(_) => {},
 						  Err(e) =>debug!("Error in initiate request: {:?}",&e),
 					  }
-					
+
 				   },
 				   _ =>{}
 			   }

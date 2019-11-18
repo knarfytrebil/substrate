@@ -32,21 +32,21 @@ num-traits = { version = "0.2.8", default-features = false }
 zeroize = { version = "0.10.1", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false, optional = true }
 parking_lot = { version = "0.9.0", optional = true }
-threshold_crypto =  { version = "0.3.2", optional=true }
+threshold_crypto =  { git = "https://github.com/poanetwork/threshold_crypto",  features = ["codec-support"], default-features = false, optional=true }
 pairing = { version = "0.14.2", features = ["u128-support"],optional=true }
-rand04_compat = { version = "0.1.1", optional=true }
 rand_chacha = { version =  "0.1.1", optional=true }
 pbkdf2 = { version = "0.3.0", default-features = false,optional=true  }
-badger = { package= "hbbft", path="../../../hbbft", optional=true }
-bincode = { version = "1.0.1", optional=true}
-curv = {git = "https://github.com/KZen-networks/curv", tag = "v0.2.2", features =  ["ec_secp256k1","rust-gmp"], optional=true }
-multi-party-ecdsa = { package = "multi-party-ecdsa", git = "https://github.com/kigawas/multi-party-ecdsa", branch = "fix-nightly",optional=true}
-secp256k1_wrap = { package = "secp256k1", version="0.15.5",optional=true}
+# badger = { package= "hbbft", path="../../../hbbft", optional=true }
+bincode = { version = "1.2.0", optional=true}
+# curv = {git = "https://github.com/KZen-networks/curv", tag = "v0.2.2", features =  ["ec_secp256k1","rust-gmp"], optional=true }
+# multi-party-ecdsa = { package = "multi-party-ecdsa", git = "https://github.com/kigawas/multi-party-ecdsa", branch = "fix-nightly",optional=true}
+# secp256k1_wrap = { package = "secp256k1", version="0.15.5",optional=true}
 libsecp256k1 = { version = "0.3.0", default-features = false, optional = true }
 tiny-keccak = { version = "1.5.0", optional = true }
 substrate-debug-derive = { version = "2.0.0", path = "./debug-derive" }
 externalities = { package = "substrate-externalities", path = "../externalities", optional = true }
 primitives-storage = { package = "substrate-primitives-storage", path = "storage", default-features = false }
+runtime-interface = { package = "substrate-runtime-interface", path = "../runtime-interface", default-features = false }
 
 
 hmac = { version = "0.7.1",optional=true}
@@ -72,14 +72,13 @@ std = [
 	"pbkdf2",
 	"bincode",
 	"hmac",
-	"curv",
-	"secp256k1_wrap",
+	# "curv",
+	# "secp256k1_wrap",
 	"threshold_crypto",
-	"multi-party-ecdsa",
-	"badger",
+	# "multi-party-ecdsa",
+	# "badger",
 	"pairing",
 	"rand_chacha",
-	"rand04_compat",
 	"wasmi",
 	"lazy_static",
 	"parking_lot",
@@ -115,17 +114,21 @@ std = [
 	"substrate-debug-derive/std",
 	"externalities",
 	"primitives-storage/std",
+	"runtime-interface/std",
+	"zeroize/alloc"
 ]
 
 # This feature enables all crypto primitives for `no_std` builds like microcontrollers
 # or Intel SGX.
 # For the regular wasm runtime builds this should not be used.
 full_crypto = [
+	"threshold_crypto",
 	"ed25519-dalek",
 	"blake2-rfc",
 	"schnorrkel",
 	"libsecp256k1",
 	"hex",
 	"sha2",
-	"twox-hash"
+	"twox-hash",
+	"runtime-interface/disable_target_static_assertions",
 ]

@@ -12,14 +12,16 @@
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
+// along with Substrate.  If not, see <http://www.gnu .org/licenses/>.
 
 //! Substrate chain configurations.
+use serde::{Serialize, Deserialize};
+use chain_spec::ChainSpecExtension;
+use hb_node_runtime::Block;
 
-use primitives::{sr25519, Pair,Public, crypto::UncheckedInto};// ed25519, 
-use hb_node_primitives::{AccountId,  Balance};
+use primitives::{sr25519, Pair,Public, };// ed25519, crypto::UncheckedInto
 use substrate_service;
-use hex_literal::hex;
+//use hex_literal::hex;
 use substrate_telemetry::TelemetryEndpoints;
 //use badger_primitives::AuthorityId as BadgerId;
 
@@ -33,11 +35,26 @@ use hb_node_runtime::constants::currency::DOLLARS;
 
 //use hb_node_runtime::constants::time::SECS_PER_BLOCK;
 use hb_node_runtime::constants::currency::MILLICENTS;
+use sr_primitives::{ traits::{Verify, IdentifyAccount}};
+pub use hb_node_primitives::{AccountId, Balance, Signature};
+
 
 const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
+
+#[derive(Default, Clone, Serialize, Deserialize, ChainSpecExtension)]
+pub struct Extensions {
+	/// Block numbers with known hashes.
+	pub fork_blocks: client::ForkBlocks<Block>,
+}
+
 /// Specialized `ChainSpec`.
-pub type ChainSpec = substrate_service::ChainSpec<GenesisConfig>;
+pub type ChainSpec = substrate_service::ChainSpec<
+	GenesisConfig,
+	Extensions,
+>;
+type AccountPublic = <Signature as Verify>::Signer;
+
 
 
 /// Flaming Fir testnet generator
@@ -56,7 +73,7 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 	// generated with secret: subkey inspect "$secret"/fir
 	let endowed_accounts: Vec<AccountId> = vec![
 		// 5Ff3iXP75ruzroPWRP2FYBHWnmGGBSb63857BgnzCoXNxfPo
-		hex!["9ee5e5bdc0ec239eb164f865ecc345ce4c88e76ee002e0f7e318097347471809"].unchecked_into(),
+		//hex!["9ee5e5bdc0ec239eb164f865ecc345ce4c88e76ee002e0f7e318097347471809"].unchecked_into(),
 	];
 
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
@@ -101,18 +118,16 @@ pub fn staging_testnet_config() -> ChainSpec {
 		Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
 		None,
 		None,
-		None,
+		Default::default(),
 	)
 }
 
-/// Helper function to generate AccountId from seed
-pub fn get_account_id_from_seed(seed: &str) -> AccountId {
-	sr25519::Pair::from_string(&format!("//{}", seed), None)
-		.expect("static values are valid; qed")
-		.public()
+/// Gets account ID from seed? 
+pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
+	AccountPublic: From<<TPublic::Pair as Pair>::Public>
+{
+	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
-
-
 
 
 
@@ -193,51 +208,119 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 	}*/
 //}
 
+pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId,) {
+	(
+		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
+		get_account_id_from_seed::<sr25519::Public>(seed),
+	)
+}
+
+
 fn development_config_genesis() -> GenesisConfig {
 	testnet_genesis(
-		vec![ get_account_id_from_seed("Alice")],
-		get_account_id_from_seed("Alice"),
+		vec![
+			get_authority_keys_from_seed("Alice"),
+		],
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		None,
+		true
 	)
 }
 
 /// Development config (single validator Alice)
 pub fn development_config() -> ChainSpec {
-	ChainSpec::from_genesis("Development", "dev", development_config_genesis, vec![], None, None, None, None)
+	ChainSpec::from_genesis(
+		"Development",
+		"dev",
+		development_config_genesis,
+		vec![],
+		None,
+		None,
+		None,
+		Default::default(),
+	)
 }
 
-/// Local testnet config (multivalidator Alice + Bob)
+
+/// function, probably 
 pub fn local_testnet_config() -> ChainSpec {
-	ChainSpec::from_genesis("Local Testnet", "local_testnet", local_testnet_genesis, vec![], None, None, None, None)
+	ChainSpec::from_genesis(
+		"Local Testnet",
+		"local_testnet",
+		local_testnet_genesis,
+		vec![],
+		None,
+		None,
+		None,
+		Default::default(),
+	)
 }
-
 
 
 fn local_testnet_genesis() -> GenesisConfig {
 	testnet_genesis(
 		vec![
-			get_account_id_from_seed("Alice"),
-			get_account_id_from_seed("Bob")
+			get_authority_keys_from_seed("Alice"),
+			get_authority_keys_from_seed("Bob"),
 		],
-		get_account_id_from_seed("Alice"),
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		None,
+		false,
 	)
 }
 
-fn testnet_genesis(endowed_accounts: Vec<AccountId>, root_key: AccountId) -> GenesisConfig {
+
+/// Helper function to create GenesisConfig for testing
+pub fn testnet_genesis(
+	initial_authorities: Vec<(AccountId, AccountId)>,
+	root_key: AccountId,
+	endowed_accounts: Option<Vec<AccountId>>,
+	enable_println: bool,
+) -> GenesisConfig {
+	let endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
+		vec![
+			get_account_id_from_seed::<sr25519::Public>("Alice"),
+			get_account_id_from_seed::<sr25519::Public>("Bob"),
+			get_account_id_from_seed::<sr25519::Public>("Charlie"),
+			get_account_id_from_seed::<sr25519::Public>("Dave"),
+			get_account_id_from_seed::<sr25519::Public>("Eve"),
+			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+			get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+			get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+			get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+			get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
+			get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
+			get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+		]
+	});
+
+	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
+	const STASH: Balance = 100 * DOLLARS;
+
 	GenesisConfig {
 		system: Some(SystemConfig {
 			code: WASM_BINARY.to_vec(),
 			changes_trie_config: Default::default(),
 		}),
-		indices: Some(IndicesConfig {
-			ids: endowed_accounts.clone(),
-		}),
-		contracts: Some(ContractsConfig {
-			current_schedule: Default::default(),
-			gas_price: 1 * MILLICENTS,
-		}),
 		balances: Some(BalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|k|(k, 1 << 60)).collect(),
+			balances: endowed_accounts.iter().cloned()
+				.map(|k| (k, ENDOWMENT))
+				.chain(initial_authorities.iter().map(|x| (x.0.clone(), STASH)))
+				.collect(),
 			vesting: vec![],
+		}),
+		indices: Some(IndicesConfig {
+			ids: endowed_accounts.iter().cloned()
+				.chain(initial_authorities.iter().map(|x| x.0.clone()))
+				.collect::<Vec<_>>(),
+		}),
+
+		contracts: Some(ContractsConfig {
+			current_schedule: contracts::Schedule {
+				enable_println, // this should only be enabled on development chains
+				..Default::default()
+			},
+			gas_price: 1 * MILLICENTS,
 		}),
 		sudo: Some(SudoConfig {
 			key: root_key,

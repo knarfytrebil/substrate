@@ -3,11 +3,11 @@ use std::convert::TryInto;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
-
+use runtime_primitives::app_crypto::RuntimeAppPublic;
 use badger::dynamic_honey_badger::DynamicHoneyBadger;
 use badger::queueing_honey_badger::QueueingHoneyBadger;
 use badger::sender_queue::{Message as BMessage, SenderQueue};
-use badger::sync_key_gen::{to_pub_keys, PartOutcome, SyncKeyGen};
+//use badger::sync_key_gen::{to_pub_keys, PartOutcome, SyncKeyGen};
 use badger::{ConsensusProtocol, CpStep, NetworkInfo, Target};
 use futures03::channel::{mpsc, oneshot};
 use futures03::prelude::*;
@@ -18,11 +18,14 @@ use parity_codec::{Decode, Encode};
 use parking_lot::RwLock;
 use rand::{rngs::OsRng, Rng};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-
+use serde::{Serialize};//Deserialize
+use badger::crypto::{ SecretKey};
+// PublicKey, PublicKeySet, PublicKeyShare, , SecretKeyShare, Signature,
+//};//
+use substrate_primitives::crypto::Pair;
+use runtime_primitives::app_crypto::hbbft_thresh::Public as bPublic;
 use badger_primitives::AuthorityId;
 pub use badger_primitives::HBBFT_ENGINE_ID;
-use badger_primitives::{PublicKeyWrap, SignatureWrap};
 use gossip::{Action, BadgeredMessage, GossipMessage, GreetingMessage, Peers};
 use network::config::Roles;
 use network::consensus_gossip::MessageIntent;
@@ -40,8 +43,7 @@ use crate::Error;
 mod peerid;
 pub use peerid::PeerIdW;
 
-// #[cfg(test)]
-// mod tests;
+
 
 //use badger::{SourcedMessage as BSM,  TargetedMessage};
 
@@ -74,9 +76,7 @@ pub fn badger_topic<B: BlockT>() -> B::Hash
 #[derive(Clone, Debug, PartialEq, Eq, Encode, Decode)]
 pub enum LocalTarget
 {
-  /// The message must be sent to all remote nodes.
-  // All,
-  /// The message must be sent to the node with the given ID.
+   /// The message must be sent to the node with the given ID.
   Nodes(BTreeSet<PeerIdW>),
   /// The message must be sent to all remote nodes except the passed nodes.
   /// Useful for sending messages to observer nodes that aren't
@@ -111,7 +111,7 @@ impl Into<Target<PeerIdW>> for LocalTarget
 }
 
 #[derive(Eq, PartialEq, Debug, Encode, Decode)]
-struct SourcedMessage<D: ConsensusProtocol>
+pub struct SourcedMessage<D: ConsensusProtocol>
 where
   D::NodeId: Encode + Decode + Clone,
 {
@@ -155,9 +155,9 @@ where
   /// Incoming messages from other nodes that this node has not yet handled.
   // in_queue: VecDeque<SourcedMessage<D>>,
   /// Outgoing messages to other nodes.
-  out_queue: VecDeque<SourcedMessage<D>>,
+  pub out_queue: VecDeque<SourcedMessage<D>>,
   /// The values this node has output so far, with timestamps.
-  outputs: VecDeque<D::Output>,
+  pub outputs: VecDeque<D::Output>,
   _block: PhantomData<B>,
 }
 
@@ -224,13 +224,13 @@ where
     let mut rng = OsRng::new().unwrap();
     let secr = match config.secret_key_share.clone()
     {
-      Some(wrap) => Some(wrap.0.clone()),
+      Some(key) => Some((*key).clone()),
       None => None,
     };
     let ni = NetworkInfo::<D::NodeId>::new(
       PeerIdW { 0: self_id.clone() },
       secr,
-      config.public_key_set.0.clone(),
+      (*config.public_key_set).clone(),
       //config.node_id.1.clone(),
       config.initial_validators.clone().keys(),
       //config.node_indices.clone(),
@@ -246,9 +246,10 @@ where
       .filter(|&them| *them != PeerIdW { 0: self_id.clone() })
       .cloned()
       .collect();
+    let secr:SecretKey = bincode::deserialize( &config.node_id.to_raw_vec()).unwrap();
     let dhb = DynamicHoneyBadger::builder().build(
       ni,
-      config.node_id.1.clone(),
+      secr,
       Arc::new(config.initial_validators.clone()),
     );
     let (qhb, qhb_step) = QueueingHoneyBadger::builder(dhb)
@@ -283,7 +284,7 @@ where
         .initial_validators
         .clone()
         .iter()
-        .map(|(_, val)| PublicKeyWrap { 0: *val })
+        .map(|(_, val)|   Into::<bPublic>::into(*val).into() )
         .collect(),
       config: config.clone(),
       //in_queue: VecDeque::new(),
@@ -294,7 +295,7 @@ where
     for (k, v) in config.initial_validators.clone()
     {
       info!("BaDGER!! Registering {:?} {:?}", &k.0, &v);
-      node.register_peer_public_key(&k.0, PublicKeyWrap { 0: v })
+      node.register_peer_public_key(&k.0,  Into::<bPublic>::into(v).into() )
     }
     node
   }
@@ -551,10 +552,8 @@ impl<Block: BlockT> BadgerGossipValidator<Block>
       {
         Ok(GossipMessage::Greeting(msg)) =>
         {
-          if msg
-            .my_id
-            .0
-            .verify(&msg.my_sig.0, msg.my_id.0.to_bytes().to_vec())
+          if badger_primitives::app::Public::verify(
+             &msg.my_id,&msg.my_id.encode().to_vec(),&msg.my_sig,)
           {
             info!(
               "BadGER: got Greeting {:?} {:?} {:?}",
@@ -585,19 +584,16 @@ impl<Block: BlockT> BadgerGossipValidator<Block>
               .initial_validators
               .get(&PeerIdW { 0: rd.id.clone() })
             {
-              Some(val) => Some(PublicKeyWrap { 0: val.clone() }),
+              Some(val) => Some( Into::<bPublic>::into(val.clone()).into() ),
               None => None,
             },
-            my_id: PublicKeyWrap {
-              0: rd.config.node_id.0.clone(),
-            },
-            my_sig: SignatureWrap {
-              0: rd
+            my_id:  rd.config.node_id.public().clone(),
+
+            my_sig: rd
                 .config
                 .node_id
-                .1
-                .sign(rd.config.node_id.0.clone().to_bytes().to_vec()),
-            },
+                .sign(&rd.config.node_id.public().clone().encode().to_vec()),
+
           };
           peer_reply = Some(GossipMessage::Greeting(msrep));
           Action::ProcessAndDiscard
@@ -641,7 +637,7 @@ impl<Block: BlockT> BadgerGossipValidator<Block>
             Action::Discard
           }
         }
-        Ok(GossipMessage::KeygenData(keygen_msg)) => Action::Discard,
+        Ok(GossipMessage::KeygenData(_)) => Action::Discard,//keygen_msg
 
         Err(e) =>
         {
@@ -678,17 +674,18 @@ impl<Block: BlockT> network_gossip::Validator<Block> for BadgerGossipValidator<B
           .initial_validators
           .get(&PeerIdW::from(inner.id.clone()))
         {
-          Some(val) => Some(PublicKeyWrap(val.clone())),
+          Some(val) =>
+            {
+              let pk: runtime_primitives::app_crypto::hbbft_thresh::Public=val.clone().into();
+              Some(pk.into())} ,
           None => None,
         },
-        my_id: PublicKeyWrap(inner.config.node_id.0),
-        my_sig: SignatureWrap(
-          inner
+        my_id: inner.config.node_id.public(),
+        my_sig:  inner
             .config
             .node_id
-            .1
-            .sign(inner.config.node_id.0.clone().to_bytes().to_vec()),
-        ),
+            .sign(&inner.config.node_id.public().clone().encode().to_vec()),
+
       }
     };
 
@@ -1159,10 +1156,10 @@ impl<'g, 'p, B: BlockT> ValidatorContext<B> for NetworkSubtext<'g, 'p, B>
   {
     self.protocol.send_consensus(
       who.clone(),
-      ConsensusMessage {
+      vec![ConsensusMessage {
         engine_id: self.engine_id,
         data: message,
-      },
+      }],
     );
   }
 

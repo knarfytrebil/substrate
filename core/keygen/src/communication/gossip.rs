@@ -1,5 +1,5 @@
 use codec::{Decode, Encode};
-use log::{error, info, trace, warn};
+//use log::{error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::VecDeque,
@@ -199,7 +199,6 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 		if all_peers_len >= players {
 			panic!("peers enough");
 			// don't take > n peers
-			return;
 		}
 
 		inner.add_peer(who.clone());

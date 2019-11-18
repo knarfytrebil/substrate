@@ -42,4 +42,3 @@ stress-test = []
 [[bench]]
 name = "bench"
 harness = false
-

@@ -37,7 +37,7 @@ use srml_support::{
    storage::StorageValue, Parameter, //storage::StorageMap,
 };
 use substrate_mpecdsa_primitives::{
-  get_complete_list_prefix, get_key_prefix, ConsensusLog, RequestId, //get_data_prefix, 
+  get_complete_list_prefix, get_key_prefix, ConsensusLog, RequestId, //get_data_prefix,
   MAIN_DB_PREFIX, MP_ECDSA_ENGINE_ID,
 };
 
@@ -164,7 +164,7 @@ decl_module! {
     {
        print("Offchain ONCHAIN");
       <Self as Store>::Test::put(10);
-      
+
     }
     fn report_result(
       origin,
@@ -207,10 +207,10 @@ decl_module! {
   {
   let _who =	ensure_signed(origin)?;
   let mut a:Vec<u8>=MAIN_DB_PREFIX.to_vec();
-  let mut b=req_id.encode(); 
+  let mut b=req_id.encode();
   a.append(&mut b);
     let kind = primitives::offchain::StorageKind::PERSISTENT;
-  runtime_io::local_storage_set(kind,&a,b"new");
+  runtime_io::offchain::local_storage_set(kind,&a,b"new");
     if <Self as Store>::RequestResults::exists(req_id)
     {
       return Err("Duplicate request ID");
@@ -229,7 +229,7 @@ decl_module! {
           let call = Call::set_test();
       T::SubmitTransaction::submit_unsigned(call).map_err(|_| OffchainErr::SubmitTransaction);
       // Only send messages if we are a potential validator.
-      if runtime_io::is_validator() {
+      if runtime_io::offchain::is_validator() {
 //        let mut requests = <ReqIds>::get();
         Self::offchain();
       }
@@ -283,7 +283,7 @@ impl<T: Trait> Module<T>
   pub fn offchain()
   {
     let cl_key = get_complete_list_prefix();
-    let result = runtime_io::local_storage_get(StorageKind::PERSISTENT, &cl_key);
+    let result = runtime_io::offchain::local_storage_get(StorageKind::PERSISTENT, &cl_key);
     if let Some(dat) = result
     {
       let requests: Vec<RequestId> = match Decode::decode(&mut dat.as_ref())
@@ -298,7 +298,7 @@ impl<T: Trait> Module<T>
 
       let _:Vec<RequestId>=requests.iter().filter(|req_id| {
         let key: Vec<u8> = get_key_prefix(**req_id);
-        let result = runtime_io::local_storage_get(StorageKind::PERSISTENT, &key);
+        let result = runtime_io::offchain::local_storage_get(StorageKind::PERSISTENT, &key);
         if let Some(r) = result
         {
           match Self::do_post_result(**req_id, r)
@@ -328,7 +328,7 @@ impl<T: Trait> srml_support::unsigned::ValidateUnsigned for Module<T> {
 	fn validate_unsigned(call: &Self::Call) -> TransactionValidity {
     print("OFFCHAIN VALIDATE");
 		if let Call::set_test() = call {
-	
+
   	return Ok(ValidTransaction {
 				priority: 0,
 				requires: vec![],
@@ -336,11 +336,11 @@ impl<T: Trait> srml_support::unsigned::ValidateUnsigned for Module<T> {
 				longevity: TransactionLongevity::max_value(),
 				propagate: true,
 			});
-	
-		
-		
+
+
+
 		} else {
-			
+
      if let  Call::report_result(res, signature)= call
      {
        	return Ok(ValidTransaction {
@@ -354,6 +354,6 @@ impl<T: Trait> srml_support::unsigned::ValidateUnsigned for Module<T> {
 
 
 		}
-    	InvalidTransaction::Call.into() 
+    	InvalidTransaction::Call.into()
 	}
 }

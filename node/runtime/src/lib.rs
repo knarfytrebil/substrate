@@ -18,55 +18,54 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 
-use rstd::prelude::*;
-use support::{
-	construct_runtime, parameter_types, traits::{SplitTwoWays, Currency, Randomness}
+use client::{
+	block_builder::api::{self as block_builder_api, CheckInherentsResult, InherentData},
+	impl_runtime_apis, runtime_api as client_api,
+};
+use contracts_rpc_runtime_api::ContractExecResult;
+use grandpa::fg_primitives;
+use grandpa::AuthorityList as GrandpaAuthorityList;
+use im_online::sr25519::AuthorityId as ImOnlineId;
+use node_primitives::{
+	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, Moment, Signature,
 };
 use primitives::u32_trait::{_1, _2, _3, _4};
-use node_primitives::{
-	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index,
-	Moment, Signature,
-};
-use grandpa::fg_primitives;
-use client::{
-	block_builder::api::{self as block_builder_api, InherentData, CheckInherentsResult},
-	runtime_api as client_api, impl_runtime_apis
-};
-use sr_primitives::{Permill, Perbill, ApplyResult, impl_opaque_keys, generic, create_runtime_str};
+use primitives::OpaqueMetadata;
+use rstd::prelude::*;
 use sr_primitives::curve::PiecewiseLinear;
+use sr_primitives::traits::{
+	self, BlakeTwo256, Block as BlockT, NumberFor, OpaqueKeys, SaturatedConversion, StaticLookup,
+};
 use sr_primitives::transaction_validity::TransactionValidity;
 use sr_primitives::weights::Weight;
-use sr_primitives::traits::{
-	self, BlakeTwo256, Block as BlockT, NumberFor, StaticLookup, SaturatedConversion,
-	OpaqueKeys,
+use sr_primitives::{create_runtime_str, generic, impl_opaque_keys, ApplyResult, Perbill, Permill};
+use support::{
+	construct_runtime, parameter_types,
+	traits::{Currency, Randomness, SplitTwoWays},
 };
-use version::RuntimeVersion;
+use system::offchain::TransactionSubmitter;
+use transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
 #[cfg(any(feature = "std", test))]
 use version::NativeVersion;
-use primitives::OpaqueMetadata;
-use grandpa::{AuthorityId as GrandpaId, AuthorityWeight as GrandpaWeight};
-use im_online::sr25519::{AuthorityId as ImOnlineId};
-use transaction_payment_rpc_runtime_api::RuntimeDispatchInfo;
-use contracts_rpc_runtime_api::ContractExecResult;
-use system::offchain::TransactionSubmitter;
+use version::RuntimeVersion;
 
-#[cfg(any(feature = "std", test))]
-pub use sr_primitives::BuildStorage;
-pub use timestamp::Call as TimestampCall;
 pub use balances::Call as BalancesCall;
 pub use contracts::Gas;
-pub use support::StorageValue;
+#[cfg(any(feature = "std", test))]
+pub use sr_primitives::BuildStorage;
 pub use staking::StakerStatus;
+pub use support::StorageValue;
+pub use timestamp::Call as TimestampCall;
 
 /// Implementations of some helper traits passed into runtime modules as associated types.
 pub mod impls;
-use impls::{CurrencyToVoteHandler, Author, LinearWeightToFee, TargetedFeeAdjustment};
+use impls::{Author, CurrencyToVoteHandler, LinearWeightToFee, TargetedFeeAdjustment};
 
 /// Constant values used within the runtime.
 pub mod constants;
-use constants::{time::*, currency::*};
+use constants::{currency::*, time::*};
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
@@ -81,8 +80,8 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	// and set impl_version to equal spec_version. If only runtime
 	// implementation changes and behavior does not, then leave spec_version as
 	// is and increment impl_version.
-	spec_version: 192,
-	impl_version: 191,
+	spec_version: 193,
+	impl_version: 193,
 	apis: RUNTIME_API_VERSIONS,
 };
 
@@ -100,8 +99,10 @@ type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
 pub type DealWithFees = SplitTwoWays<
 	Balance,
 	NegativeImbalance,
-	_4, Treasury,   // 4 parts (80%) goes to the treasury.
-	_1, Author,     // 1 part (20%) goes to the block author.
+	_4,
+	Treasury, // 4 parts (80%) goes to the treasury.
+	_1,
+	Author, // 1 part (20%) goes to the block author.
 >;
 
 parameter_types! {
@@ -154,7 +155,7 @@ impl indices::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const ExistentialDeposit: Balance = 1 * CENTS;
+	pub const ExistentialDeposit: Balance = 1 * DOLLARS;
 	pub const TransferFee: Balance = 1 * CENTS;
 	pub const CreationFee: Balance = 1 * CENTS;
 }
@@ -259,7 +260,7 @@ impl staking::Trait for Runtime {
 	type Currency = Balances;
 	type Time = Timestamp;
 	type CurrencyToVote = CurrencyToVoteHandler;
-	type OnRewardMinted = Treasury;
+	type RewardRemainder = Treasury;
 	type Event = Event;
 	type Slash = Treasury; // send the slashed funds to the treasury.
 	type Reward = (); // rewards are minted from the void
@@ -290,15 +291,19 @@ impl democracy::Trait for Runtime {
 	/// A straight majority of the council can decide what their next motion is.
 	type ExternalOrigin = collective::EnsureProportionAtLeast<_1, _2, AccountId, CouncilCollective>;
 	/// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
-	type ExternalMajorityOrigin = collective::EnsureProportionAtLeast<_3, _4, AccountId, CouncilCollective>;
+	type ExternalMajorityOrigin =
+		collective::EnsureProportionAtLeast<_3, _4, AccountId, CouncilCollective>;
 	/// A unanimous council can have the next scheduled referendum be a straight default-carries
 	/// (NTB) vote.
-	type ExternalDefaultOrigin = collective::EnsureProportionAtLeast<_1, _1, AccountId, CouncilCollective>;
+	type ExternalDefaultOrigin =
+		collective::EnsureProportionAtLeast<_1, _1, AccountId, CouncilCollective>;
 	/// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
 	/// be tabled immediately and with a shorter voting/enactment period.
-	type FastTrackOrigin = collective::EnsureProportionAtLeast<_2, _3, AccountId, TechnicalCollective>;
+	type FastTrackOrigin =
+		collective::EnsureProportionAtLeast<_2, _3, AccountId, TechnicalCollective>;
 	// To cancel a proposal which has been passed, 2/3 of the council must agree to it.
-	type CancellationOrigin = collective::EnsureProportionAtLeast<_2, _3, AccountId, CouncilCollective>;
+	type CancellationOrigin =
+		collective::EnsureProportionAtLeast<_2, _3, AccountId, CouncilCollective>;
 	// Any single technical committee member may veto a coming council proposal, however they can
 	// only do it once and it lasts only for the cooloff period.
 	type VetoOrigin = collective::EnsureMember<AccountId, TechnicalCollective>;
@@ -478,7 +483,10 @@ impl system::offchain::CreateTransaction<Runtime, UncheckedExtrinsic> for Runtim
 		public: Self::Public,
 		account: AccountId,
 		index: Index,
-	) -> Option<(Call, <UncheckedExtrinsic as traits::Extrinsic>::SignaturePayload)> {
+	) -> Option<(
+		Call,
+		<UncheckedExtrinsic as traits::Extrinsic>::SignaturePayload,
+	)> {
 		let period = 1 << 8;
 		let current_block = System::block_number().saturated_into::<u64>();
 		let tip = 0;
@@ -565,7 +573,8 @@ pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
 /// Extrinsic type that has already been checked.
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Runtime, AllModules>;
+pub type Executive =
+	executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Runtime, AllModules>;
 
 impl_runtime_apis! {
 	impl client_api::Core<Block> for Runtime {
@@ -623,7 +632,7 @@ impl_runtime_apis! {
 	}
 
 	impl fg_primitives::GrandpaApi<Block> for Runtime {
-		fn grandpa_authorities() -> Vec<(GrandpaId, GrandpaWeight)> {
+		fn grandpa_authorities() -> GrandpaAuthorityList {
 			Grandpa::grandpa_authorities()
 		}
 	}
@@ -704,8 +713,6 @@ impl_runtime_apis! {
 
 	impl substrate_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
-			let seed = seed.as_ref().map(|s| rstd::str::from_utf8(&s)
-				.expect("Seed is an utf8 string"));
 			SessionKeys::generate(seed)
 		}
 	}
@@ -720,15 +727,17 @@ mod tests {
 	use super::*;
 	use system::offchain::SubmitSignedTransaction;
 
-	fn is_submit_signed_transaction<T>(_arg: T) where
+	fn is_submit_signed_transaction<T>(_arg: T)
+	where
 		T: SubmitSignedTransaction<
 			Runtime,
 			Call,
-			Extrinsic=UncheckedExtrinsic,
-			CreateTransaction=Runtime,
-			Signer=ImOnlineId,
+			Extrinsic = UncheckedExtrinsic,
+			CreateTransaction = Runtime,
+			Signer = ImOnlineId,
 		>,
-	{}
+	{
+	}
 
 	#[test]
 	fn validate_bounds() {

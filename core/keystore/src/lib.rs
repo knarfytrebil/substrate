@@ -19,7 +19,7 @@
 #![warn(missing_docs)]
 
 use std::{collections::HashMap, path::PathBuf, fs::{self, File}, io::{self, Write}, sync::Arc};
-
+use serde::{Serialize,Deserialize};
 use primitives::{
 	crypto::{KeyTypeId, Pair as PairT, Public, IsWrappedBy, Protected}, traits::BareCryptoStore,
 };
@@ -118,11 +118,32 @@ impl Store {
 		file.flush().map_err(Error::Io)?;
 		Ok(())
 	}
+	
+	///Inserts auxilliary data into keystore, serilalizing into json
+	pub fn insert_aux_by_type<T>(&self, key_type: KeyTypeId, public: &[u8], aux_data:&T) -> Result<()> 
+	where T:Serialize
+	{
+		let mut file = File::create(self.key_aux_file_path(public, key_type)).map_err(Error::Io)?;
+		serde_json::to_writer(&file, aux_data).map_err(Error::Json)?;
+		file.flush().map_err(Error::Io)?;
+		Ok(())
+	}
+
+	///gets auxilliary data from store
+	pub fn get_aux_by_type<T>(&self, key_type: KeyTypeId, public: &[u8]) -> Result<T> 
+	where for <'b> T: Deserialize<'b>
+	{
+		let file = File::open(self.key_aux_file_path(public, key_type)).map_err(Error::Io)?;
+
+		let obj: T  = serde_json::from_reader(&file)?;
+		Ok(obj)
+	}
 
 	/// Insert a new key.
 	///
 	/// Places it into the file system store.
-	pub fn insert_by_type<Pair: PairT>(&self, key_type: KeyTypeId, suri: &str) -> Result<Pair> {
+	pub fn insert_by_type<Pair: PairT>(&self, key_type: KeyTypeId, suri: &str) -> Result<Pair> 
+	{
 		let pair = Pair::from_string(
 			suri,
 			self.password.as_ref().map(|p| &***p)
@@ -268,6 +289,14 @@ impl Store {
 		buf
 	}
 
+	fn key_aux_file_path(&self,public: &[u8], key_type: KeyTypeId) -> PathBuf
+	{
+		let mut buf = self.path.clone();
+		let key_type = hex::encode(key_type.0);
+		let key = hex::encode(public);
+		buf.push("aux_".to_owned()+&key_type + key.as_str());
+		buf
+	}
 	
 	fn request_exists(&self,request_id: &[u8],key_type: KeyTypeId) -> bool
 	{
@@ -367,6 +396,7 @@ impl BareCryptoStore for Store {
 		Ok(())
 	}
 
+	
 
 	fn sr25519_key_pair(&self, id: KeyTypeId, pub_key: &sr25519::Public) -> Option<sr25519::Pair> {
 		self.key_pair_by_type::<sr25519::Pair>(pub_key, id).ok()
@@ -444,6 +474,7 @@ mod tests {
 		assert_eq!(key.public(), key2.public());
 
 		assert_eq!(store.read().public_keys::<ed25519::AppPublic>().unwrap()[0], key.public());
+		let a=0;
 	}
 
 	#[test]

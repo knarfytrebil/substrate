@@ -72,6 +72,8 @@ pub trait BareCryptoStore: Send + Sync {
 	/// Returns the ed25519 key pair for the given key type and public key combination.
 	fn ed25519_key_pair(&self, id: KeyTypeId, pub_key: &ed25519::Public) -> Option<ed25519::Pair>;
 
+	//fn get_aux<T:Public,O> (&self,id: KeyTypeId,public:T) -> Result<O,()>;  - probably cannot be used without serialization
+
 	/// Insert a new key. This doesn't require any known of the crypto; but a public key must be
 	/// manually provided.
 	///

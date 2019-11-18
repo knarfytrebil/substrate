@@ -18,64 +18,64 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
-#![recursion_limit="256"]
-
-use rstd::prelude::*;
-use support::{
-	construct_runtime, parameter_types, traits::{Currency, Randomness}
-};
-//use primitives::u32_trait::{_1, _2, _3, _4};
-use hb_node_primitives::{
-	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index,
-	Moment, Signature,
-};
-use contracts_rpc_runtime_api::ContractExecResult;
-use substrate_badger_rapi::app::Public as BadgerId;
-pub use contracts;
-pub use contracts::Gas;
-pub use srml_keygen::sr25519::AuthorityId as KeygenId;
-
-pub type AuthorityId = ([u8; 32],[u8; 16]);
-use client::{
-	block_builder::api::{self as block_builder_api, InherentData, CheckInherentsResult},
-	runtime_api as client_api, impl_runtime_apis
-};
-use sr_primitives::{ApplyResult,  generic, create_runtime_str,impl_opaque_keys,key_types  };//key_types
-use sr_primitives::transaction_validity::TransactionValidity;
-use sr_primitives::weights::Weight;
-use sr_primitives::traits::{
-	BlakeTwo256, Block as BlockT,  NumberFor, StaticLookup,
-};
-use version::RuntimeVersion;
-use elections::VoteIndex;
-#[cfg(any(feature = "std", test))]
-use version::NativeVersion;
-use primitives::OpaqueMetadata;
-use finality_tracker::{DEFAULT_REPORT_LATENCY, DEFAULT_WINDOW_SIZE};
-
-#[cfg(any(feature = "std", test))]
-pub use sr_primitives::BuildStorage;
-pub use timestamp::Call as TimestampCall;
-pub use balances::Call as BalancesCall;
-pub use sr_primitives::{Permill, Perbill};
-pub use support::StorageValue;
-
-/// Implementations of some helper traits passed into runtime modules as associated types.
-pub mod impls;
-use impls::{CurrencyToVoteHandler, Author, LinearWeightToFee, TargetedFeeAdjustment};
-
-/// Constant values used within the runtime.
-pub mod constants;
-use constants::{time::*, currency::*};
+#![recursion_limit = "256"]
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use rstd::prelude::*;
+
+use badger_primitives::AuthorityId as BadgerId;
+use badger_primitives::AuthorityList as BadgerList;
+pub use contracts;
+pub use contracts::Gas;
+use contracts_rpc_runtime_api::ContractExecResult;
+use hb_node_primitives::{
+	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, Moment, Signature,
+};
+pub use srml_keygen::sr25519::AuthorityId as KeygenId;
+
+use client::{
+	block_builder::api::{self as block_builder_api, CheckInherentsResult, InherentData},
+	impl_runtime_apis, runtime_api as client_api,
+};
+use elections::VoteIndex;
+use finality_tracker::{DEFAULT_REPORT_LATENCY, DEFAULT_WINDOW_SIZE};
+use primitives::OpaqueMetadata;
+use sr_primitives::traits::{BlakeTwo256, Block as BlockT, NumberFor, StaticLookup};
+use sr_primitives::transaction_validity::TransactionValidity;
+use sr_primitives::weights::Weight;
+use sr_primitives::{create_runtime_str, generic, impl_opaque_keys, key_types, ApplyResult}; //key_types
+#[cfg(any(feature = "std", test))]
+use version::NativeVersion;
+use version::RuntimeVersion;
+
+pub use balances::Call as BalancesCall;
+
+#[cfg(any(feature = "std", test))]
+pub use sr_primitives::BuildStorage;
+
+pub use sr_primitives::{Perbill, Permill};
+pub use support::{
+	construct_runtime, parameter_types,
+	traits::{Currency, Randomness},
+	StorageValue,
+};
+pub use timestamp::Call as TimestampCall;
+
+/// Implementations of some helper traits passed into runtime modules as associated types.
+pub mod impls;
+use impls::{Author, CurrencyToVoteHandler, LinearWeightToFee, TargetedFeeAdjustment};
+
+/// Constant values used within the runtime.
+pub mod constants;
+use constants::{currency::*, time::*};
+
 /// Runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("node"),
-	impl_name: create_runtime_str!("substrate-node"),
+	spec_name: create_runtime_str!("hb-node"),
+	impl_name: create_runtime_str!("substrate-hb-node"),
 	authoring_version: 10,
 	// Per convention: if the runtime behavior changes, increment spec_version
 	// and set impl_version to equal spec_version. If only runtime
@@ -101,10 +101,9 @@ pub type SessionHandlers = (Badger,);
 
 impl_opaque_keys! {
 	pub struct SessionKeys {
-		pub hbbft: BadgerId,
+		pub hbbft: Badger,
 	}
 }
-
 
 parameter_types! {
 	pub const BlockHashCount: BlockNumber = 250;
@@ -131,7 +130,6 @@ impl system::Trait for Runtime {
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = Version;
 }
-
 
 impl contracts::Trait for Runtime {
 	type Currency = Balances;
@@ -163,8 +161,6 @@ impl contracts::Trait for Runtime {
 	type Time = Timestamp;
 }
 
-
-
 parameter_types! {
 	pub const EpochDuration: u64 = EPOCH_DURATION_IN_SLOTS;
 	pub const ExpectedBlockTime: Moment = MILLISECS_PER_BLOCK;
@@ -173,7 +169,6 @@ parameter_types! {
 	pub const TombstoneDeposit: Balance = 1 * DOLLARS;
 	pub const RentByteFee: Balance = 1 * DOLLARS;
 }
-
 
 impl indices::Trait for Runtime {
 	type AccountIndex = AccountIndex;
@@ -224,8 +219,6 @@ impl authorship::Trait for Runtime {
 	type EventHandler = ();
 }
 
-
-
 parameter_types! {
 	pub const LaunchPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
 	pub const VotingPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
@@ -234,8 +227,6 @@ parameter_types! {
 	pub const EnactmentPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
 	pub const CooloffPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
 }
-
-
 
 parameter_types! {
 	pub const CandidacyBond: Balance = 10 * DOLLARS;
@@ -249,17 +240,12 @@ parameter_types! {
 	pub const DecayRatio: u32 = 0;
 }
 
-
-
-
-
 parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const ProposalBondMinimum: Balance = 1 * DOLLARS;
 	pub const SpendPeriod: BlockNumber = 1 * DAYS;
 	pub const Burn: Permill = Permill::from_percent(50);
 }
-
 
 parameter_types! {
 	pub const ContractTransferFee: Balance = 1 * CENTS;
@@ -274,25 +260,18 @@ impl sudo::Trait for Runtime {
 	type Proposal = Call;
 }
 
-
-impl srml_badger::Trait for Runtime
-{
-	type Event=Event;
-
+impl srml_badger::Trait for Runtime {
+	type Event = Event;
 }
 use system::offchain::TransactionSubmitter;
 
-
 type SubmitTransaction = TransactionSubmitter<KeygenId, Runtime, UncheckedExtrinsic>;
-impl srml_keygen::Trait for Runtime
-{
-	type Event=Event;
-    type AuthorityId=KeygenId;
+impl srml_keygen::Trait for Runtime {
+	type Event = Event;
+	type AuthorityId = KeygenId;
 	type Call = Call;
 	type SubmitTransaction = SubmitTransaction;
-
 }
-
 
 parameter_types! {
 	pub const WindowSize: BlockNumber = DEFAULT_WINDOW_SIZE.into();
@@ -368,7 +347,8 @@ pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signatu
 /// Extrinsic type that has already been checked.
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>;
 /// Executive: handles dispatch to the various modules.
-pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Runtime, AllModules>;
+pub type Executive =
+	executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Runtime, AllModules>;
 
 impl_runtime_apis! {
 	impl client_api::Core<Block> for Runtime {
@@ -382,6 +362,12 @@ impl_runtime_apis! {
 
 		fn initialize_block(header: &<Block as BlockT>::Header) {
 			Executive::initialize_block(header)
+		}
+	}
+	
+	impl badger_primitives::BadgerApi<Block> for Runtime {
+		fn badger_authorities() -> BadgerList {
+			Badger::badger_authorities()
 		}
 	}
 
@@ -408,7 +394,7 @@ impl_runtime_apis! {
 			data.check_extrinsics(&block)
 		}
 
-        fn random_seed() -> <Block as BlockT>::Hash {
+		fn random_seed() -> <Block as BlockT>::Hash {
 			RandomnessCollectiveFlip::random_seed()
 		}
 	}
@@ -429,7 +415,7 @@ impl_runtime_apis! {
 
 	impl substrate_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
-			let seed = seed.as_ref().map(|s| rstd::str::from_utf8(&s).expect("Seed is an utf8 string"));
+			//let seed = seed.as_ref().map(|s| rstd::str::from_utf8(&s).expect("Seed is an utf8 string"));
 			//Vec::new()
 			SessionKeys::generate(seed)
 		}
@@ -480,13 +466,7 @@ impl_runtime_apis! {
 			})
 		}
 	}
-    impl substrate_badger_rapi::HbbftApi<Block> for Runtime
-	{
- fn do_nothing()
- {
 
- }
-	}
 	//not used for now and has no_std problems
 	/*	impl HbbftApi<Block> for Runtime
 		{

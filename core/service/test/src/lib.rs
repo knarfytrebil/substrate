@@ -158,9 +158,11 @@ fn node_config<G, E: Clone> (
 		node_name: "unknown".to_owned(),
 		transport: TransportConfig::Normal {
 			enable_mdns: false,
+			allow_private_ipv4: true,
 			wasm_external_transport: None,
 		},
 		propagate_extr: false,
+		max_parallel_downloads: NetworkConfiguration::default().max_parallel_downloads,
 	};
 
 	Configuration {

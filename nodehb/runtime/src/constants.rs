@@ -21,26 +21,14 @@ pub mod currency {
 	use hb_node_primitives::Balance;
 
 	pub const MILLICENTS: Balance = 1_000_000_000;
-	pub const CENTS: Balance = 1_000 * MILLICENTS;    // assume this is worth about a cent.
+	pub const CENTS: Balance = 1_000 * MILLICENTS; // assume this is worth about a cent.
 	pub const DOLLARS: Balance = 100 * CENTS;
 }
 
 /// Time.
 pub mod time {
-	use hb_node_primitives::{Moment, BlockNumber};
+	use hb_node_primitives::{BlockNumber, Moment};
 
-	/// Since BABE is probabilistic this is the average expected block time that
-	/// we are targetting. Blocks will be produced at a minimum duration defined
-	/// by `SLOT_DURATION`, but some slots will not be allocated to any
-	/// authority and hence no block will be produced. We expect to have this
-	/// block time on average following the defined slot duration and the value
-	/// of `c` configured for BABE (where `1 - c` represents the probability of
-	/// a slot being empty).
-	/// This value is only used indirectly to define the unit constants below
-	/// that are expressed in blocks. The rest of the code should use
-	/// `SLOT_DURATION` instead (like the timestamp module for calculating the
-	/// minimum period).
-	/// <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
 	pub const MILLISECS_PER_BLOCK: Moment = 6000;
 	pub const SECS_PER_BLOCK: Moment = MILLISECS_PER_BLOCK / 1000;
 
