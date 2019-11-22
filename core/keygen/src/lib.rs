@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-//#![feature(async_closure)]
-=======
->>>>>>> ada6eea5c70dc89ce34688fcb25b40a720010a39
-
 use client::backend::OffchainStorage;
 use primitives::offchain::StorageKind;
 use std::{

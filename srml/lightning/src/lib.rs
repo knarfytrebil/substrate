@@ -15,6 +15,7 @@ use ln_primitives::{
   Account, Tx
 };
 use primitives::offchain::StorageKind;
+use runtime_io::offchain::local_storage_get;
 
 pub trait Trait: system::Trait {
   type Call: From<Call<Self>>;
@@ -64,7 +65,7 @@ decl_module! {
     }
 
     fn offchain_worker(now: T::BlockNumber) {
-      let pub_key = runtime_io::local_storage_get(StorageKind::PERSISTENT, b"ltn_keys").unwrap();
+      let pub_key = local_storage_get(StorageKind::PERSISTENT, b"ltn_keys").unwrap();
       let call = Call::sync_pub_key(pub_key);
       T::SubmitTransaction::submit_unsigned(call);
     }
