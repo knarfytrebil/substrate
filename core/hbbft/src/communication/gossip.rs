@@ -1,6 +1,6 @@
 //use runtime_primitives::traits::Block as BlockT;
 //use network::consensus_gossip::{self as network_gossip, MessageIntent, ValidatorContext};
-use badger_primitives::{AuthorityId, AuthoritySignature};
+use badger_primitives::{AuthorityId, AuthorityPair, AuthoritySignature};
 use network::PeerId; //config::Roles,
 use parity_codec::{Decode, Encode};
 
@@ -8,10 +8,14 @@ use parity_codec::{Decode, Encode};
 //use log::{trace, debug, warn};
 //use futures03::prelude::*;
 //use futures03::channel::mpsc;
-
 use log::info;
+use rand::{rngs::OsRng, Rng};
+use std::collections::BTreeMap;
 use std::collections::HashMap;
-//use std::time::{ Instant};//Duration
+use substrate_primitives::crypto::Pair; //RuntimeAppPublic
+                                        //use std::time::{ Instant};//Duration
+
+use app_crypto::RuntimeAppPublic;
 
 //const REBROADCAST_AFTER: Duration = Duration::from_secs(60 * 5);
 //const CATCH_UP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
@@ -29,13 +33,23 @@ use crate::communication::PeerIdW;
 #[derive(Debug, Encode, Decode)]
 pub enum GossipMessage
 {
-  /// Greeting to register peer id. Probably should be replaced by Session aspects
-  Greeting(GreetingMessage),
   /// Raw Badger data
   BadgerData(BadgeredMessage),
-
   KeygenData(BadgeredMessage),
-  RequestGreeting,
+  Session(SessionMessage),
+}
+
+impl GossipMessage
+{
+  pub fn verify(&self) -> bool
+  {
+    match self
+    {
+      GossipMessage::BadgerData(data) => data.verify(),
+      GossipMessage::KeygenData(data) => data.verify(),
+      GossipMessage::Session(data) => data.verify(),
+    }
+  }
 }
 
 #[derive(Debug, Encode, Decode)]
@@ -43,24 +57,47 @@ pub struct BadgeredMessage
 {
   pub uid: u64,
   pub data: Vec<u8>,
-  pub originator: PeerIdW,
+  pub originator: AuthorityId,
+  pub datasig: AuthoritySignature,
+}
+
+impl BadgeredMessage
+{
+  pub fn new(originator: AuthorityPair, data: &[u8]) -> BadgeredMessage
+  {
+    let uuid = OsRng::new().unwrap().gen::<u64>();
+    BadgeredMessage {
+      uid: uuid,
+      data: data.iter().cloned().collect(),
+      originator: originator.public(),
+      datasig: originator.sign(data),
+    }
+  }
+  pub fn verify(&self) -> bool
+  {
+    badger_primitives::app::Public::verify(&self.originator, &self.data, &self.datasig)
+  }
 }
 
 #[derive(Debug, Encode, Decode)]
-pub struct GreetingMessage
+pub struct SessionData
 {
-  pub my_pubshare: Option<AuthorityId>,
-  /// the badger ID of the peer
-  pub my_id: AuthorityId,
-  /// Signature to verify id
-  pub my_sig: AuthoritySignature,
+  pub ses_id: u32,
+  pub session_key: AuthorityId,
+  pub peer_id: PeerIdW,
 }
 
-impl From<GreetingMessage> for GossipMessage
+#[derive(Debug, Encode, Decode)]
+pub struct SessionMessage
 {
-  fn from(greet: GreetingMessage) -> Self
+  pub ses: SessionData,
+  pub sgn: AuthoritySignature,
+}
+impl SessionMessage
+{
+  pub fn verify(&self) -> bool
   {
-    GossipMessage::Greeting(greet)
+    badger_primitives::app::Public::verify(&self.ses.session_key, &self.ses.encode(), &self.sgn)
   }
 }
 
@@ -74,24 +111,26 @@ pub enum PeerConsensusState
 }
 pub struct PeerInfo
 {
-  //view: View<N>,
   pub id: Option<AuthorityId>, //public key
+  pub net_id: PeerId,
   pub state: PeerConsensusState,
 }
 
 impl PeerInfo
 {
-  fn new() -> Self
+  fn new(n_id: PeerId) -> Self
   {
     PeerInfo {
       id: None,
       state: PeerConsensusState::Unknown,
+      net_id: n_id,
     }
   }
-  fn new_id(id: AuthorityId) -> Self
+  fn new_id(id: AuthorityId, n_id: PeerId) -> Self
   {
     PeerInfo {
       id: Some(id),
+      net_id: n_id,
       state: PeerConsensusState::Unknown,
     }
   }
@@ -100,16 +139,15 @@ impl PeerInfo
 /// The peers we're connected to in gossip.
 pub struct Peers
 {
-  inner: HashMap<PeerId, PeerInfo>,
+  pub inner: HashMap<PeerId, PeerInfo>,
+  pub inverse: BTreeMap<AuthorityId, PeerId>,
 }
 
 impl Default for Peers
 {
   fn default() -> Self
   {
-    Peers {
-      inner: HashMap::new(),
-    }
+    Peers::new()
   }
 }
 
@@ -119,6 +157,7 @@ impl Peers
   {
     Peers {
       inner: HashMap::new(),
+      inverse: BTreeMap::new(),
     }
   }
   pub fn new_peer(&mut self, who: PeerId)
@@ -129,7 +168,7 @@ impl Peers
       {}
       None =>
       {
-        let ti = PeerInfo::new();
+        let ti = PeerInfo::new(who.clone());
         self.inner.insert(who, ti);
       }
     }
@@ -144,7 +183,7 @@ impl Peers
       }
       None =>
       {
-        let mut ti = PeerInfo::new();
+        let mut ti = PeerInfo::new(who.clone());
         ti.state = state;
         self.inner.insert(who.clone(), ti);
       }
@@ -159,12 +198,37 @@ impl Peers
     self
       .inner
       .iter()
-      .filter(|v| {
-        v.1.state == PeerConsensusState::Connected ||
-          v.1.state == PeerConsensusState::GreetingReceived
+      .filter(|v| v.1.state == PeerConsensusState::Connected || v.1.state == PeerConsensusState::GreetingReceived)
+      .map(|(k, _)| k.clone())
+      .collect()
+  }
+  pub fn connected_badgerid_list(&self) -> Vec<AuthorityId>
+  {
+    self
+      .inverse
+      .iter()
+      .filter(|(_k, v)| {
+        let kk = self.inner.get(v);
+        if kk.is_none()
+        {
+          return false;
+        }
+
+        kk.unwrap().state == PeerConsensusState::Connected || kk.unwrap().state == PeerConsensusState::GreetingReceived
       })
       .map(|(k, _)| k.clone())
       .collect()
+  }
+  pub fn badgerid_to_peerid(&self, id: &AuthorityId) -> Option<PeerId>
+  {
+    if let Some(pi) = self.inverse.get(id)
+    {
+      Some(self.inner.get(pi).unwrap().net_id.clone())
+    }
+    else
+    {
+      None
+    }
   }
 
   pub fn peer_disconnected(&mut self, who: &PeerId)
@@ -188,18 +252,44 @@ impl Peers
 
   pub fn update_id(&mut self, who: &PeerId, auth_id: AuthorityId)
   {
-    let peer = match self.inner.get_mut(who)
+    let _peer = match self.inner.get_mut(who)
     {
       None =>
       {
-        self.inner.insert(who.clone(), PeerInfo::new_id(auth_id));
+        self
+          .inner
+          .insert(who.clone(), PeerInfo::new_id(auth_id.clone(), who.clone()));
+        self.inverse.insert(auth_id.clone(), who.clone());
         return;
       }
-      Some(p) => p,
+      Some(p) =>
+      {
+        if let Some(authority) = &p.id
+        {
+          if *authority != auth_id
+          {
+            self.inverse.remove(&authority);
+            
+          }
+        }
+        if !self.inverse.contains_key(&auth_id)
+        {
+          self.inverse.insert(auth_id.clone(), who.clone());
+        }   
+      
+        p.id = Some(auth_id);
+      }
     };
-    peer.id = Some(auth_id);
   }
 
+  pub fn peer_by_id<'a>(&'a self, who: &AuthorityId) -> Option<&'a PeerInfo>
+  {
+    match self.inverse.get(who)
+    {
+      None => None,
+      Some(id) => self.inner.get(id),
+    }
+  }
   pub fn peer<'a>(&'a self, who: &PeerId) -> Option<&'a PeerInfo>
   {
     self.inner.get(who)
@@ -216,4 +306,20 @@ pub enum Action<H>
   // discard
   Discard,
   Useless(H),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum SAction
+{
+  // propagate to neigbors if unknown
+  PropagateOnce,
+
+  //Keep in slot and propagate occasionally
+  RepropagateKeep,
+
+  // Discard immediately
+  Discard,
+
+  //Queue locally and retry later, contains relevance/topic?
+  QueueRetry(u64),
 }

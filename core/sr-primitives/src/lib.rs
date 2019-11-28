@@ -42,7 +42,7 @@ pub use primitives::storage::{StorageOverlay, ChildrenStorageOverlay};
 
 use rstd::prelude::*;
 use rstd::convert::TryFrom;
-use primitives::{crypto, ed25519, sr25519, ecdsa, hash::{H256, H512}};
+use primitives::{crypto, ed25519, sr25519, ecdsa, hbbft_thresh,  hash::{H256, H512}};
 use codec::{Encode, Decode};
 
 #[cfg(feature = "std")]
@@ -209,6 +209,8 @@ pub enum MultiSigner {
 	Sr25519(sr25519::Public),
 	/// An SECP256k1/ECDSA identity (actually, the Blake2 hash of the pub key).
 	Ecdsa(ecdsa::Public),
+	///Hb normal key
+	Hbbft(hbbft_thresh::Public),
 }
 
 impl Default for MultiSigner {
@@ -231,6 +233,7 @@ impl AsRef<[u8]> for MultiSigner {
 			MultiSigner::Ed25519(ref who) => who.as_ref(),
 			MultiSigner::Sr25519(ref who) => who.as_ref(),
 			MultiSigner::Ecdsa(ref who) => who.as_ref(),
+			MultiSigner::Hbbft(ref who) => who.as_ref(),
 		}
 	}
 }
@@ -242,13 +245,25 @@ impl traits::IdentifyAccount for MultiSigner {
 			MultiSigner::Ed25519(who) => <[u8; 32]>::from(who).into(),
 			MultiSigner::Sr25519(who) => <[u8; 32]>::from(who).into(),
 			MultiSigner::Ecdsa(who) => runtime_io::hashing::blake2_256(who.as_ref()).into(),
-		}
+			MultiSigner::Hbbft(who) => {
+				//let a:[u8;32]=[0;32];
+				//a.copy_from_slice(&who.0[0..32]);
+				//a.into()
+				runtime_io::hashing::blake2_256(who.as_ref()).into()
+			},
 	}
+}
 }
 
 impl From<ed25519::Public> for MultiSigner {
 	fn from(x: ed25519::Public) -> Self {
 		MultiSigner::Ed25519(x)
+	}
+}
+
+impl From<hbbft_thresh::Public> for MultiSigner {
+	fn from(x: hbbft_thresh::Public) -> Self {
+		MultiSigner::Hbbft(x)
 	}
 }
 
@@ -292,6 +307,8 @@ impl std::fmt::Display for MultiSigner {
 			MultiSigner::Ed25519(ref who) => write!(fmt, "ed25519: {}", who),
 			MultiSigner::Sr25519(ref who) => write!(fmt, "sr25519: {}", who),
 			MultiSigner::Ecdsa(ref who) => write!(fmt, "ecdsa: {}", who),
+			MultiSigner::Hbbft(ref who) => write!(fmt, "hbbft: {}", who),
+
 		}
 	}
 }

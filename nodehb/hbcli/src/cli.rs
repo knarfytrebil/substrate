@@ -28,7 +28,7 @@ use transaction_factory::RuntimeAdapter;
 use client::ExecutionStrategies;
 use badger_primitives::app::Public;
 use badger_primitives::app::Signature;
-use badger::{self, badger_import_queue,  }; //run_honey_badger//Config as BadgerConfig
+use badger::{self, badger_import_queue,  }; 
 
 /// Custom subcommands.
 #[derive(Clone, Debug, StructOpt)]

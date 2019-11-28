@@ -33,7 +33,7 @@ use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2018::party_i::{
 };
 use parking_lot::RwLock;
 use rand::prelude::Rng;
-use tokio02::timer::Interval;
+use futures_timer::Interval;
 use tokio_executor::DefaultExecutor;
 
 use client::{

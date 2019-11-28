@@ -11,6 +11,7 @@ codec = { package = "parity-scale-codec", version = "1.0.6", default-features = 
 sr-primitives = { path = "../../sr-primitives", default-features = false }
 rstd = { package = "sr-std", path = "../../sr-std", default-features = false }
 serde = { version = "1.0.102", optional = true, features = ["derive"] }
+threshold_crypto = {  git = "https://github.com/poanetwork/threshold_crypto", features = ["codec-support"],  default-features = false,optional=true }
 
 [features]
 default = ["std"]
@@ -20,5 +21,6 @@ std = [
 	"sr-primitives/std",
 	"rstd/std",
 	"serde",
-	"app-crypto/std"
+	"app-crypto/std",
+	"threshold_crypto"
 ]

@@ -786,7 +786,6 @@ pub trait Pair: CryptoType + Sized + Clone + Send + Sync + 'static {
 
 		let phrase = cap.name("phrase").map(|r| r.as_str()).unwrap_or(DEV_PHRASE);
 		let password = password_override.or_else(|| cap.name("password").map(|m| m.as_str()));
-
 		let (root, seed) = if phrase.starts_with("0x") {
 			hex::decode(&phrase[2..]).ok()
 				.and_then(|seed_vec| {

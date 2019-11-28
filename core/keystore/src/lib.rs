@@ -23,7 +23,6 @@ use serde::{Serialize,Deserialize};
 use primitives::{
 	crypto::{KeyTypeId, Pair as PairT, Public, IsWrappedBy, Protected}, traits::BareCryptoStore,
 };
-
 use app_crypto::{AppKey, AppPublic, AppPair, ed25519, sr25519,hbbft_thresh};
 
 use parking_lot::RwLock;
@@ -106,6 +105,7 @@ impl Store {
 	/// Does not place it into the file system store.
 	fn insert_ephemeral_pair<Pair: PairT>(&mut self, pair: &Pair, key_type: KeyTypeId) {
 		let key = (key_type, pair.public().to_raw_vec());
+		//print!("Inserting ephemeral {:?} {:?}",)
 		self.additional.insert(key, pair.to_raw_vec());
 	}
 
@@ -139,6 +139,18 @@ impl Store {
 		Ok(obj)
 	}
 
+	//remove aux data
+	pub fn delete_aux(&self, key_type: KeyTypeId, public: &[u8])-> Result<()> 
+	{
+		let path=self.key_aux_file_path(public, key_type);
+		if path.exists()
+		{
+		 std::fs::remove_file(path)?;
+		}
+
+		Ok(())
+	}
+
 	/// Insert a new key.
 	///
 	/// Places it into the file system store.
@@ -167,6 +179,7 @@ impl Store {
 		let (pair, phrase, _) = Pair::generate_with_phrase(self.password.as_ref().map(|p| &***p));
 		let mut file = File::create(self.key_file_path(pair.public().as_slice(), key_type))?;
 		serde_json::to_writer(&file, &phrase)?;
+	//	print!("GENFILE {:?} \n",&hex::encode(pair.public().as_slice()));
 		file.flush()?;
 		Ok(pair)
 	}
@@ -215,7 +228,7 @@ impl Store {
 			&phrase,
 			self.password.as_ref().map(|p| &***p),
 		).map_err(|_| Error::InvalidPhrase)?;
-
+				
 		if &pair.public() == public {
 			Ok(pair)
 		} else {

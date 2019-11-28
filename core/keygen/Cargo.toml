@@ -25,7 +25,7 @@ inherents = { package = "substrate-inherents", path = "../../core/inherents" }
 network = { package = "substrate-network", path = "../network", features=["upgraded"] }
 service = { package = "substrate-service", path = "../service", optional = true }
 srml-finality-tracker = { path = "../../srml/finality-tracker" }
-
+futures-timer = "0.4"
 mpe-primitives = { package = "substrate-mpecdsa-primitives", path = "primitives" }
 serde = "1.0"
 multihash = { package = "parity-multihash", version = "0.1" }

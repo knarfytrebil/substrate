@@ -24,6 +24,21 @@ impl PartialOrd for PeerIdW
   }
 }
 
+/*
+impl From<&PeerId> for &PeerIdW
+{
+  fn from(id: &PeerId) -> Self {
+    &PeerIdW{0:*id}
+}
+}*/
+impl AsRef<PeerId> for PeerIdW
+{
+  fn as_ref(&self) -> &PeerId
+  {
+    &self.0
+  }
+}
+
 impl Ord for PeerIdW
 {
   fn cmp(&self, other: &Self) -> Ordering

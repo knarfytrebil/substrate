@@ -676,7 +676,8 @@ where
 	config.impl_name = impl_name;
 	config.impl_commit = version.commit;
 	config.impl_version = version.version;
-        config.n_conf_file=  cli.nconffile;
+	config.n_conf_file=  cli.nconffile;
+	config.node_key=cli.network_config.node_key_params.node_key.clone();
 	config.name = match cli.name.or(cli.keyring.account.map(|a| a.to_string())) {
 		None => generate_node_name(),
 		Some(name) => name,
@@ -756,8 +757,7 @@ where
 		(params::OffchainWorkerEnabled::Never, _) => false,
 		(params::OffchainWorkerEnabled::WhenValidating, _) => false,
 	};
-   info!("OFFCHAIN {}",config.offchain_worker);
-	config.roles = role;
+ 	config.roles = role;
 	config.disable_grandpa = cli.no_grandpa;
 
 	let client_id = config.client_id();

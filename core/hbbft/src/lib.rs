@@ -20,10 +20,11 @@ use hex;
 use log::{debug, error, info, trace, warn};
 use parity_codec::{Decode, Encode};
 use parking_lot::Mutex;
-use serde_json as json;
-use serde_json::Value;
-use serde_json::Value::Number;
-use serde_json::Value::Object;
+
+use badger_primitives::HBBFT_ENGINE_ID;
+
+use badger_primitives::ConsensusLog;
+
 
 use consensus_common::evaluation;
 use inherents::InherentIdentifier;
@@ -34,7 +35,7 @@ use runtime_primitives::traits::{
 };
 
 use runtime_primitives::{
-	generic::{self, BlockId},
+	generic::{self, BlockId,OpaqueDigestItemId},
 	ApplyError, Justification,
 };
 
@@ -78,6 +79,7 @@ pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"snakeshr";
 
 pub type BadgerImportQueue<B> = BasicQueue<B>;
 pub mod aux_store;
+pub mod rpc;
 pub struct BadgerWorker<C, I, SO, Inbound, B: BlockT, N: Network<B>, A>
 where
 	A: txpool::ChainApi,
@@ -247,16 +249,16 @@ impl<B, E, Block: BlockT<Hash=H256>, RA> AuthoritySetGetter<Block> for Client<B,
 pub struct Config {
 	/// Some local identifier of the node.
 	pub name: Option<String>,
-	pub num_validators: usize,
-	pub secret_key_share: Option<Arc<SecretKeyShare>>,
-	pub node_id: Arc<AuthorityPair>,
-	pub public_key_set: Arc<PublicKeySet>,
+//pub num_validators: usize,
+//	pub secret_key_share: Option<Arc<SecretKeyShare>>,
+//	pub node_id: Arc<AuthorityPair>,
+//	pub public_key_set: Arc<PublicKeySet>,
 	pub batch_size: u32,
-	pub initial_validators: BTreeMap<PeerIdW, PublicKey>,
-	pub node_indices: BTreeMap<PeerIdW, usize>,
+//	pub initial_validators: BTreeMap<PeerIdW, PublicKey>, replaced by session aspects
+//	pub node_indices: BTreeMap<PeerIdW, usize>, unnecessary
 }
 
-fn secret_share_from_string(st: &str) -> Result<SecretKeyShare, Error> {
+fn _secret_share_from_string(st: &str) -> Result<SecretKeyShare, Error> {
 	let data = hex::decode(st)?;
 	match bincode::deserialize(&data) {
 		Ok(val) => Ok( val ),
@@ -271,7 +273,7 @@ impl Config {
 			.map(|s| s.as_str())
 			.unwrap_or("<unknown>")
 	}
-	pub fn from_json_file_with_name(path: PathBuf, name: &str) -> Result<Self, String> {
+	/* pub fn from_json_file_with_name(path: PathBuf, name: &str) -> Result<Self, String> {
 		let file = File::open(&path).map_err(|e| format!("Error opening config file: {}", e))?;
 		let spec: serde_json::Value =
 			json::from_reader(file).map_err(|e| format!("Error parsing spec file: {}", e))?;
@@ -285,17 +287,7 @@ impl Config {
 
 		let ret = Config {
 			name: Some(name.to_string()),
-			num_validators: match &spec["num_validators"] {
-				Number(x) => match x.as_u64() {
-					Some(y) => y as usize,
-					None => return Err("Invalid num_validators 1".to_string()),
-				},
-				Value::String(st) => match st.parse::<usize>() {
-					Ok(v) => v,
-					Err(_) => return Err("Invalid num_validators 2".to_string()),
-				},
-				_ => return Err("Invalid num_validators 3".to_string()),
-			},
+
 			secret_key_share: match &nodedata["secret_key_share"] {
 				Value::String(st) => Some(Arc::new(match secret_share_from_string(&st) {
 					Ok(val) => val,
@@ -360,64 +352,10 @@ impl Config {
 				_ => return Err("Invalid batch_size".to_string()),
 			},
 
-			initial_validators: match &spec["initial_validators"] {
-				Object(dict) => {
-					let mut ret = BTreeMap::<PeerIdW, PublicKey>::new();
-					for (k, v) in dict.iter() {
-						let peer = match PeerId::from_str(k) {
-							Ok(val) => val,
-							Err(_) => return Err("Invalid PeerId".to_string()),
-						};
-						let data = match hex::decode(v.as_str().unwrap()) {
-							Ok(val) => val,
-							Err(_) => return Err("Hex error in pubkey".to_string()),
-						};
-						let pubkey: PublicKey = match bincode::deserialize(&data) {
-							Ok(val) => val,
-							Err(_) => return Err("public key binary invalid".to_string()),
-						};
-
-						//		let cpeer=peer.clone();
-						ret.insert(PeerIdW { 0: peer }, pubkey);
-					}
-					let kv: Vec<_> = ret.keys().cloned().collect();
-					for k in kv {
-						info!("JSON! {:?} {:?}", &k, &ret.get(&k));
-					}
-					ret
-				}
-				_ => return Err("Invalid initial_validators, should be object".to_string()),
-			},
-			node_indices: match &spec["node_indices"] {
-				Object(dict) => {
-					let mut ret = BTreeMap::<PeerIdW, usize>::new();
-					for (k, v) in dict.iter() {
-						let peer = match PeerId::from_str(k) {
-							Ok(val) => val,
-							Err(_) => return Err("Invalid PeerId".to_string()),
-						};
-						let numb = match &v {
-							Number(x) => match x.as_u64() {
-								Some(y) => y as usize,
-								None => return Err("Invalid num_validators 1".to_string()),
-							},
-							Value::String(st) => match st.parse::<usize>() {
-								Ok(v) => v,
-								Err(_) => return Err("Invalid num_validators 2".to_string()),
-							},
-							_ => return Err("Invalid num_validators 3".to_string()),
-						};
-
-						ret.insert(PeerIdW { 0: peer }, numb);
-					}
-
-					ret
-				}
-				_ => return Err("Invalid initial_validators, should be object".to_string()),
-			},
+	
 		};
 		Ok(ret)
-	}
+	}*/
 }
 
 /// Errors that can occur while voting in BADGER.
@@ -435,6 +373,7 @@ pub enum Error {
 	Safety(String),
 	/// A timer failed to fire.
 	Timer(tokio_timer::Error),
+
 }
 
 impl From<hex::FromHexError> for Error {
@@ -608,6 +547,9 @@ where
 	phb: PhantomData<Block>,
 }
 
+use crate::aux_store::GenesisAuthoritySetProvider;
+
+
 /// Run a HBBFT churn as a task. Provide configuration and a link to a
 /// block import worker that has already been instantiated with `block_import`.
 pub fn run_honey_badger<B, E, Block: BlockT<Hash = H256>, N, RA, SC, X, I, A>(
@@ -620,6 +562,8 @@ pub fn run_honey_badger<B, E, Block: BlockT<Hash = H256>, N, RA, SC, X, I, A>(
 	inherent_data_providers: InherentDataProviders,
 	selch: SC,
 	keystore: KeyStorePtr,
+	node_key:Option<String>,
+	dev_seed:Option<String>
 ) -> ::client::error::Result<impl Future<Output = ()> + Send + Unpin>
 where
 	Block::Hash: Ord,
@@ -638,7 +582,19 @@ where
 	RA: ConstructRuntimeApi<Block, Client<B, E, Block, RA>>,
 	<Client<B, E, Block, RA> as ProvideRuntimeApi>::Api: BlockBuilderApi<Block>,
 {
-	let (network_bridge, network_startup) = NetworkBridge::new(network, config.clone());
+	let genesis_authorities_provider= &*client.clone();
+	let persistent_data = aux_store::load_persistent_badger(
+		&*client,
+		|| {
+			let authorities = genesis_authorities_provider.get()?;
+			telemetry!(CONSENSUS_INFO; "afg.loading_authorities";
+				"authorities_len" => ?authorities.len()
+			);
+			Ok(authorities)
+		},keystore.clone()
+	)?;
+	info!("Badger AUTH {:?}",&persistent_data.authority_set.inner);
+	let (network_bridge, network_startup) = NetworkBridge::new(network, config.clone(),keystore.clone(),persistent_data);
 
 	//let PersistentData { authority_set, set_state, consensus_changes } = persistent_data;
 
@@ -860,6 +816,25 @@ where
 
 				let header_num = header.number().clone();
 				let mut parent_hash = header.parent_hash().clone();
+				let id = OpaqueDigestItemId::Consensus(&HBBFT_ENGINE_ID);
+
+				/*let filter_log = |log: ConsensusLog<NumberFor<B>>| match log {
+					ConsensusLog::ScheduledChange(change) => Some(change),
+					_ => None, convert_f
+				};*/
+			
+				// find the consensus digests with the right ID which converts to
+				// the right kind of consensus log.
+				let badger_logs:Vec<_>=header.digest().logs().iter().map(
+					|x| x.try_to(id)).filter( |x:&Option<ConsensusLog>| x.is_some()).map(|x| x.unwrap()).collect();
+				for log in badger_logs
+				{
+					//TODO!
+					/*match log
+					{
+						ConsensusLog
+					}*/
+				}
 
 				// sign the pre-sealed hash of the block and then
 				// add it to a digest item.
@@ -903,6 +878,7 @@ where
 							"hash" => ?eh, "err" => ?e);
 					}
 				}
+				
 			}
 		}
 		info!("[[[[[[[--]]]]]]]");
@@ -912,10 +888,18 @@ where
 
 	//.map(|_| ()).map_err(|e|
 	//    {
-	//			warn!("BADGER failed: {:?}", e);
+	//			warn!("BADGER failed: {:?}", e); 
 	//			telemetry!(CONSENSUS_WARN; "afg.badger_failed"; "e" => ?e);
 	//		}) ;
 
+	
+	use hex_literal::*;
+	use substrate_primitives::crypto::Pair;
+//	let ap:app_crypto::hbbft_thresh::Public=hex!["946252149ad70604cf41e4b30db13861c919d7ed4e8f9bd049958895c6151fab8a9b0b027ad3372befe22c222e9b733f"].into();
+
+//	let secr:SecretKey=bincode::deserialize(&keystore.read().key_pair_by_type::<AuthorityPair>(&ap.into(), app_crypto::key_types::HB_NODE).unwrap().to_raw_vec()).unwrap();
+//	info!("Badger AUTH  private {:?}",&secr);
+	
 	let with_start = network_startup.then(move |()| futures03::future::join(sender, receiver));
 	let ping_client = client.clone();
 	// Delay::new(Duration::from_secs(1)).then(|_| {

@@ -29,10 +29,11 @@
 
 // re-export since this is necessary for `impl_apis` in runtime.
 //pub use substrate_badger_primitives as fg_primitives;
-use badger_primitives::AuthorityId;
-use badger_primitives::HBBFT_AUTHORITIES_KEY;
+use badger_primitives::{AuthorityId,SignedAccountBinding};
+use badger_primitives::{HBBFT_AUTHORITIES_KEY,HBBFT_AUTHORITIES_MAP_KEY};
 use codec::{self as codec, Decode, Encode, Error,Codec};
 use rstd::prelude::*;
+use rstd::collections::btree_map::BTreeMap;
 use sr_primitives::{
 	generic::{DigestItem, OpaqueDigestItemId},
 	traits::Zero,
@@ -42,68 +43,28 @@ use srml_support::{
 	decl_event, decl_module, decl_storage, dispatch::Result, storage::StorageMap,
 	storage::StorageValue, storage
 };
+use session::OnSessionEnding;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
 use sr_primitives::ConsensusEngineId;
+use app_crypto::RuntimeAppPublic;
 
-pub const HBBFT_ENGINE_ID: ConsensusEngineId = *b"BDGR";
+//pub const HBBFT_ENGINE_ID: ConsensusEngineId = *b"BDGR";
 
-//use fg_primitives::HBBFT_ENGINE_ID;
+use badger_primitives::{HBBFT_ENGINE_ID,ConsensusLog};
 //pub use fg_primitives::{AuthorityId, ConsensusLog};
-use system::{ensure_signed, DigestOf};
+use system::{ensure_signed, };//DigestOf
 
 //#[derive(Decode, Encode, PartialEq, Eq, Clone,Hash)]
 //pub type AuthorityId = ([u8; 32],[u8; 16]);
 
 /// An consensus log item for BADGER.
-#[cfg_attr(feature = "std", derive(Serialize, Debug))]
-#[derive(Decode, Encode, PartialEq, Eq, Clone)]
-pub enum ConsensusLog {
-	/// Schedule an authority set add by voting... If others also vote
-	#[codec(index = "1")]
-	VoteToAdd(AuthorityId),
-	/// Schedule an authority set removal by voting... If others also vote
-	#[codec(index = "2")]
-	VoteToRemove(AuthorityId),
-    ///completed voting ... may not need these if we use session?
-	#[codec(index = "3")]
-  VoteComplete(Vec<AuthorityId>),
-  #[codec(index = "4")]
-  NotifyChangedSet(Vec<AuthorityId>),
-  
-}
-
-impl ConsensusLog {
-	/// Try to cast the log entry as a contained signal.
-	pub fn try_into_add(self) -> Option<AuthorityId> {
-		match self {
-			ConsensusLog::VoteToAdd(id) => Some(id),
-			_ => None,
-		}
-	}
-
-	/// Try to cast the log entry as a contained forced signal.
-	pub fn try_into_remove(self) -> Option<AuthorityId> {
-		match self {
-			ConsensusLog::VoteToRemove(id) => Some(id),
-			_ => None,
-		}
-	}
-
-	/// Try to cast the log entry as a contained pause signal.
-	pub fn try_into_complete(self) -> Option<Vec<AuthorityId>> {
-		match self {
-			ConsensusLog::VoteComplete(authids) => Some(authids),
-			_ => None,
-		}
-	}
-}
 
 mod mock;
 
-pub trait Trait: system::Trait {
+pub trait Trait: system::Trait+session::Trait {
 	/// The event type of this module.
 	type Event: From<Event> + Into<<Self as system::Trait>::Event>;
 }
@@ -119,35 +80,68 @@ decl_event!(
 decl_storage! {
 	trait Store for Module<T: Trait> as BadgerFinality {
 		/// The current authority set.
-		Authorities get(authorities): Vec<AuthorityId>;
+		//Authorities get(authorities): Vec<AuthorityId>;
 
 		/// The number of changes (both in terms of keys and underlying economic responsibilities)
-		/// in the "set" of Grandpa validators from genesis.
+		/// in the "set" of Badger validators from genesis.
 		CurrentSetId get(current_set_id) build(|_| 0): u64;
 	}
 	add_extra_genesis {
 		config(authorities): Vec<AuthorityId>;
-		build(|config| Module::<T>::initialize_authorities(&config.authorities))
+		build(|config| Module::<T>::initialize_authorities(&config.authorities,&BTreeMap::new()))
 	}
 }
-
-decl_module! {
+use runtime_io::misc::print_utf8;
+ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		fn deposit_event() = default;
 
-		fn on_finalize(block_number: T::BlockNumber) {
+		fn on_finalize(_block_number: T::BlockNumber) {
 
 
 		}
-
+	  fn submit_account_binding(origin,binding: SignedAccountBinding<T::AccountId>) -> Result
+	  {
+		print_utf8(b"RUNEXTRINSIC");
+	   let who=ensure_signed(origin)?;
+	   let signature_valid = binding.data.using_encoded(|encoded_data| {
+		binding.data.self_pub_key.verify(&encoded_data, &binding.sig)
+	   });
+	   if !signature_valid {return Err("Invalid signature on binder".into());}
+	   if who != binding.data.bound_account
+	   {
+		print_utf8(b"ERROR: Invalid account trying to use binder");
+		return Err("Invalid account trying to use binder".into());
+	   }
+		 if Self::check_either_present(&who,&binding.data.self_pub_key)
+		 {
+			print_utf8(b"ERROR: Account or node already bound");
+		
+			return Err("Account or node already bound".into());
+		 }
+		 let mut auth_map:BTreeMap<T::AccountId,AuthorityId>=storage::unhashed::take_or_default::<BTreeMap<T::AccountId,AuthorityId>>(HBBFT_AUTHORITIES_MAP_KEY).into();
+		 auth_map.insert(binding.data.bound_account,binding.data.self_pub_key);
+		 storage::unhashed::put(
+			HBBFT_AUTHORITIES_MAP_KEY,
+			&auth_map,
+		);
+		print_utf8(b"Success binding");
+	   //binding.data.self_pub_key.ver
+	   Ok(())
+	  }
 	//	Self::deposit_log(ConsensusLog::Resume(delay));
-	fn send_log(origin) ->Result
+	fn send_log(_origin) ->Result
 	{
-	let who =	ensure_signed(origin)?;
+		print_utf8(b"RUNEXTR");
+	//let who =	ensure_signed(origin)?;
+	//session::Module<Runtime>;
+	<session::Module<T>>::queued_keys();
 	Self::deposit_log(ConsensusLog::VoteToAdd((AuthorityId::default())));
 	Ok(())
 	}
 	}
+	//fn vote_for_auth
+	//account_to_authority
 }
 
 impl<T: Trait> sr_primitives::BoundToRuntimeAppPublic for Module<T> {
@@ -160,23 +154,48 @@ impl<T: Trait> Module<T>
   pub fn badger_authorities() -> Vec<AuthorityId> {
 		storage::unhashed::get_or_default::<Vec<AuthorityId>>(HBBFT_AUTHORITIES_KEY).into()
 	}
+	pub fn account_to_authority(acc:&T::AccountId) ->Option<AuthorityId>
+	{
+		let auth_map:BTreeMap<T::AccountId,AuthorityId>=storage::unhashed::get_or_default::<BTreeMap<T::AccountId,AuthorityId>>(HBBFT_AUTHORITIES_MAP_KEY).into();
+		match auth_map.get(acc)
+		{
+			Some(au) =>Some(au.clone()),
+			None =>None,
+		}
+	}
+	pub fn check_either_present(acc:&T::AccountId,auth:&AuthorityId) ->bool
+	{
+		let auth_map:BTreeMap<T::AccountId,AuthorityId>=storage::unhashed::get_or_default::<BTreeMap<T::AccountId,AuthorityId>>(HBBFT_AUTHORITIES_MAP_KEY).into();
+		match auth_map.get(acc)
+		{
+			Some(au) => return true,
+			None =>{},
+		};
+       auth_map.iter().find(|(_,v)| **v==*auth ).is_some()
+	}
 
 	/// Set the current set of authorities, along with their respective weights.
-	fn set_badger_authorities(authorities: &Vec<AuthorityId>) {
+	fn set_badger_authorities(authorities: &Vec<AuthorityId>,auth_map:&BTreeMap<T::AccountId,AuthorityId>) {
 		storage::unhashed::put(
 			HBBFT_AUTHORITIES_KEY,
 			authorities,
 		);
+		storage::unhashed::put(
+			HBBFT_AUTHORITIES_MAP_KEY,
+			auth_map,
+		);
+	//	pub const HBBFT_AUTHORITIES_MAP_KEY: &'static [u8] = b":honey_badger_auth_map";
+
 	}
 
   
-  fn initialize_authorities(authorities: &Vec<AuthorityId>) {
+  fn initialize_authorities(authorities: &Vec<AuthorityId>,auth_map:&BTreeMap<T::AccountId,AuthorityId>) {
 		if !authorities.is_empty() {
 			assert!(
 				Self::badger_authorities().is_empty(),
 				"Authorities are already initialized!"
 			);
-			Self::set_badger_authorities(authorities);
+			Self::set_badger_authorities(authorities,auth_map);
 		}
   }
   
@@ -210,6 +229,23 @@ impl<T: Trait> Module<T>
 
 }
 
+impl<T: Trait> session::ShouldEndSession<T::BlockNumber> for Module<T> {
+	fn should_end_session(now: T::BlockNumber) -> bool {
+		//Self::do_initialize(now);
+          return false; //for now. TODO
+		//Self::should_epoch_change(now)
+	}
+}
+
+type SessionIndex=u32;
+
+impl<T: Trait> OnSessionEnding<T::AccountId> for Module<T> {
+	fn on_session_ending(_ending: SessionIndex, start_session: SessionIndex)
+		-> Option<Vec<T::AccountId>>
+	{
+		None //Self::new_session(start_session - 1) TODO
+	}
+}
 
 
 impl<T: Trait> session::OneSessionHandler<T::AccountId> for Module<T>
@@ -220,8 +256,9 @@ impl<T: Trait> session::OneSessionHandler<T::AccountId> for Module<T>
 	fn on_genesis_session<'a, I: 'a>(validators: I)
 		where I: Iterator<Item=(&'a T::AccountId, AuthorityId)>
 	{
-		let authorities = validators.map(|(_, k)| k).collect::<Vec<_>>();
-		Self::initialize_authorities(&authorities);
+		let auth_map = validators.map(|(k,v)| (k.clone(),v)).collect::<BTreeMap<_,_>>();
+		let authorities = auth_map.iter().map(|(_, k)| k.clone()).collect::<Vec<_>>();
+		Self::initialize_authorities(&authorities,&auth_map);
 	}
 
 	fn on_new_session<'a, I: 'a>(changed: bool, validators: I, _queued_validators: I)

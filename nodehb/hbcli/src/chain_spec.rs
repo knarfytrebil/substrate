@@ -37,10 +37,11 @@ use hb_node_runtime::constants::currency::DOLLARS;
 use hb_node_runtime::constants::currency::MILLICENTS;
 use sr_primitives::{ traits::{Verify, IdentifyAccount}};
 pub use hb_node_primitives::{AccountId, Balance, Signature};
-
+use hb_node_runtime::SessionConfig;
 
 const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
+use hb_node_runtime::SessionKeys;
 
 #[derive(Default, Clone, Serialize, Deserialize, ChainSpecExtension)]
 pub struct Extensions {
@@ -101,6 +102,9 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 		sudo: Some(SudoConfig {
 			key: endowed_accounts[0].clone(),
 		}),
+		session:  Some(SessionConfig {
+			keys: Vec::new(),
+		}),
   /*		badger: Some(BadgerConfig {
 
 		}),*/
@@ -155,63 +159,13 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 }
 
 
-//fn account_key(s: &str) -> AccountId {
-//	get_from_seed::<AccountId>(s)
-//}
 
-//impl Alternative {
-	/// Get an actual chain config from one of the alternatives.
-	/*pub(crate) fn load(self) -> Result<ChainSpec, String> {
-		Ok(match self {
-			Alternative::Development => ChainSpec::from_genesis(
-				"Development",
-				"dev",
-				|| testnet_genesis(vec![
-					account_key("Alice")
-				],
-					account_key("Alice")
-				),
-				vec![],
-				None,
-				None,
-				None,
-				None
-			),
-			Alternative::LocalTestnet => ChainSpec::from_genesis(
-				"Local Testnet",
-				"local_testnet",
-				|| testnet_genesis( vec![
-					account_key("Alice"),
-					account_key("Bob"),
-					account_key("Charlie"),
-					account_key("Dave"),
-					account_key("Eve"),
-					account_key("Ferdie"),
-				],
-					account_key("Alice"),
-				),
-				vec![],
-				None,
-				None,
-				None,
-				None
-			),
-		})
-	}*/
-
-	/*pub(crate) fn from(s: &str) -> Option<Self> {
-		match s {
-			"dev" => Some(Alternative::Development),
-			"" | "local" => Some(Alternative::LocalTestnet),
-			_ => None,
-		}
-	}*/
-//}
-
-pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId,) {
+pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId,  badger_primitives::AuthorityId) {
 	(
-		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
-		get_account_id_from_seed::<sr25519::Public>(seed),
+		//get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
+		get_account_id_from_seed::<sr25519::Public>(&format!("{}", seed)),
+		get_from_seed::<badger_primitives::AuthorityId>(seed)
+		//get_account_id_from_seed::<badger_primitives::AuthorityId>(seed),
 	)
 }
 
@@ -220,6 +174,9 @@ fn development_config_genesis() -> GenesisConfig {
 	testnet_genesis(
 		vec![
 			get_authority_keys_from_seed("Alice"),
+			get_authority_keys_from_seed("Bob"),
+			get_authority_keys_from_seed("Charlie"),
+			get_authority_keys_from_seed("Dave"),
 		],
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		None,
@@ -272,7 +229,7 @@ fn local_testnet_genesis() -> GenesisConfig {
 
 /// Helper function to create GenesisConfig for testing
 pub fn testnet_genesis(
-	initial_authorities: Vec<(AccountId, AccountId)>,
+	initial_authorities: Vec<(AccountId, badger_primitives::AuthorityId)>,
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
 	enable_println: bool,
@@ -314,7 +271,11 @@ pub fn testnet_genesis(
 				.chain(initial_authorities.iter().map(|x| x.0.clone()))
 				.collect::<Vec<_>>(),
 		}),
-
+		session:  Some(SessionConfig {
+			keys: initial_authorities.iter().map(|x| {
+				(x.0.clone(), SessionKeys { hbbft: x.1.clone() })
+			}).collect::<Vec<_>>(),
+		}),
 		contracts: Some(ContractsConfig {
 			current_schedule: contracts::Schedule {
 				enable_println, // this should only be enabled on development chains

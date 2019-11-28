@@ -35,20 +35,22 @@ use hb_node_primitives::{Block, AccountId, Index, Balance};
 use hb_node_runtime::UncheckedExtrinsic;
 use sr_primitives::traits::ProvideRuntimeApi;
 use transaction_pool::txpool::{ChainApi, Pool};
-
+use keystore::KeyStorePtr;
 /// Instantiate all RPC extensions.
-pub fn create<C, P, M>(client: Arc<C>, pool: Arc<Pool<P>>) -> jsonrpc_core::IoHandler<M> where
+pub fn create<C, P, M>(client: Arc<C>, pool: Arc<Pool<P>>,keystore:KeyStorePtr) -> jsonrpc_core::IoHandler<M> where
 	C: ProvideRuntimeApi,
 	C: client::blockchain::HeaderBackend<Block>,
 	C: Send + Sync + 'static,
 	C::Api: srml_system_rpc::AccountNonceApi<Block, AccountId, Index>,
 	C::Api: srml_contracts_rpc::ContractsRuntimeApi<Block, AccountId, Balance>,
+	C: client::backend::AuxStore+badger::aux_store::GenesisAuthoritySetProvider<Block>,
 	P: ChainApi + Sync + Send + 'static,
 	M: jsonrpc_core::Metadata + Default,
 {
 	use srml_system_rpc::{System, SystemApi};
 	use srml_contracts_rpc::{Contracts, ContractsApi};
-	use srml_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApi};
+	use badger::rpc::{BadgerRpcApi,BadgerRpcCaller};
+	//use srml_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApi};
 
 	let mut io = jsonrpc_core::IoHandler::default();
 	io.extend_with(
@@ -56,6 +58,12 @@ pub fn create<C, P, M>(client: Arc<C>, pool: Arc<Pool<P>>) -> jsonrpc_core::IoHa
 	);
 	io.extend_with(
 		ContractsApi::to_delegate(Contracts::new(client.clone()))
+	);
+	let callr: BadgerRpcCaller<C,Block> = BadgerRpcCaller::new(client.clone(),keystore.clone());
+	let del=BadgerRpcApi::<AccountId>::to_delegate(callr);
+	io.extend_with(
+		del
+		
 	);
 	io
 }

@@ -75,7 +75,7 @@ std = [
 	"treasury/std",
 	"sudo/std",
 	"version/std",
-	# "badger-primitives/std",
+	"badger-primitives/std",
 	"hb-node-primitives/std",
 	"serde",
 	"safe-mix/std",

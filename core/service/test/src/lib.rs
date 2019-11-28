@@ -200,6 +200,7 @@ fn node_config<G, E: Clone> (
 		disable_grandpa: false,
 		dev_key_seed: key_seed,
 		n_conf_file: None,
+		node_key:None
 	}
 }
 

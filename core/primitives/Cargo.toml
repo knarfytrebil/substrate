@@ -92,7 +92,6 @@ std = [
 	"hash256-std-hasher/std",
 	"hash-db/std",
 	"rstd/std",
-	"serde",
 	"rustc-hex/std",
 	"twox-hash/std",
 	"blake2-rfc/std",

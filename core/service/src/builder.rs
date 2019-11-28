@@ -601,6 +601,32 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 		})
 	}
 
+	/// Defines the RPC extensions to use, allows use of keystore.
+	pub fn with_rpc_extensions_key<URpc>(
+		self,
+		rpc_ext_builder: impl FnOnce(Arc<TCl>, Arc<TExPool>, Arc<Backend>,Arc<RwLock<Keystore>>) -> URpc
+	) -> Result<ServiceBuilder<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp,
+		TNetP, TExPool, URpc, Backend>, Error> {
+		let rpc_extensions = rpc_ext_builder(self.client.clone(), self.transaction_pool.clone(), self.backend.clone(),self.keystore.clone());
+
+		Ok(ServiceBuilder {
+			config: self.config,
+			client: self.client,
+			backend: self.backend,
+			keystore: self.keystore,
+			fetcher: self.fetcher,
+			select_chain: self.select_chain,
+			import_queue: self.import_queue,
+			finality_proof_request_builder: self.finality_proof_request_builder,
+			finality_proof_provider: self.finality_proof_provider,
+			network_protocol: self.network_protocol,
+			transaction_pool: self.transaction_pool,
+			rpc_extensions,
+			remote_backend: self.remote_backend,
+			dht_event_tx: self.dht_event_tx,
+			marker: self.marker,
+		})
+	}
 	/// Adds a dht event sender to builder to be used by the network to send dht events to the authority discovery
 	/// module.
 	pub fn with_dht_event_tx(

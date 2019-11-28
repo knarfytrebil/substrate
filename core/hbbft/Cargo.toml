@@ -12,6 +12,9 @@ fork-tree = { path = "../../core/utils/fork-tree" }
 futures03 = { package = "futures-preview", version = "0.3.0-alpha.19", features = ["compat"] }
 log = "0.4"
 parking_lot = "0.9.0"
+jsonrpc-core = "14.0.3"
+jsonrpc-core-client = "14.0.3"
+jsonrpc-derive = "14.0.3"
 tokio-executor = "0.1.7"
 tokio-timer = "0.2.11"
 rand = "0.6"
@@ -41,6 +44,7 @@ serde_bytes = "0.11"
 derive_more = "0.15"
 state_machine = { package = "substrate-state-machine", path = "../state-machine" }
 app-crypto = { package = "substrate-application-crypto", path = "../application-crypto" }
+hex-literal = { version = "0.2.1" }
 
 
 [dev-dependencies]
@@ -50,3 +54,8 @@ test-client = { package = "substrate-test-runtime-client", path = "../test-runti
 
 env_logger = "0.6"
 tokio = "0.1.17"
+
+
+[features]
+default = ["std"]
+std=[]

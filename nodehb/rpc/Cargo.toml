@@ -15,3 +15,5 @@ srml-contracts-rpc = { path = "../../srml/contracts/rpc/" }
 srml-transaction-payment-rpc = { path = "../../srml/transaction-payment/rpc/" }
 srml-system-rpc = { path = "../../srml/system/rpc/" }
 transaction_pool = { package = "substrate-transaction-pool", path = "../../core/transaction-pool" }
+badger = { package = "substrate-badger-mushroom", path = "../../core/hbbft" }
+keystore = { package = "substrate-keystore", path = "../../core/keystore" }

@@ -45,10 +45,10 @@ pub fn get_complete_list_prefix() ->Vec<u8>
        key
 }
 
+pub use sr_primitives::{ RuntimeDebug};
 
-
-#[cfg_attr(feature = "std", derive(Serialize, Debug))]
-#[derive(Decode, Encode, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "std", derive(Serialize))]
+#[derive(Decode, Encode, PartialEq, Eq, Clone,RuntimeDebug)]
 pub enum ConsensusLog {
 
 	///  Request for a new key to be generated, with provided requestid

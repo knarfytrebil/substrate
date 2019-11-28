@@ -26,9 +26,12 @@ use client::error::{Result as ClientResult, Error as ClientError};
 use runtime_primitives::traits::{Block as BlockT, };
 use log::{info, };
 use badger_primitives::{AuthorityList,SetId};
-
+use keystore::KeyStorePtr;
+use badger_primitives::AuthorityPair;
+use badger_primitives::AuthorityId;
 //use crate::authorities::{AuthoritySet, SharedAuthoritySet, PendingChange, DelayKind};
 
+use substrate_primitives::crypto::Pair;
 
 const VERSION_KEY: &[u8] = b"hbbft_schema_version";
 //const SET_STATE_KEY: &[u8] = b"grandpa_completed_round";
@@ -40,11 +43,11 @@ const CURRENT_VERSION: u32 = 0;
 
 
 #[derive(Debug, Clone, Encode, Decode)]
-
 pub struct AuthoritySet
 {
-	current_authorities: AuthorityList,
-    set_id: SetId,
+	pub current_authorities: AuthorityList,
+	pub self_id: AuthorityId,
+    pub set_id: SetId,
 }
 
 
@@ -74,9 +77,10 @@ pub struct BadgerPersistentData
 }
 
 /// Load or initialize persistent data from backend.
-pub fn load_persistent_badger<Block: BlockT, B, G>(
+pub fn load_persistent_badger< B, G>(
 	backend: &B,
 	genesis_authorities: G,
+	keystore: KeyStorePtr
 )
 	-> ClientResult<BadgerPersistentData>
 	where
@@ -118,8 +122,12 @@ pub fn load_persistent_badger<Block: BlockT, B, G>(
 	info!(target: "afg", "Loading Badger authority set \
 		from genesis on what appears to be first startup.");
 
-        let genesis_authorities = genesis_authorities()?;
-        let genesis_set=AuthoritySet{current_authorities:genesis_authorities, set_id:0};
+		let genesis_authorities = genesis_authorities()?;
+		let s_id=genesis_authorities.iter().find(|x|
+		  {
+			keystore.read().key_pair_by_type::<AuthorityPair>(*x, app_crypto::key_types::HB_NODE).is_ok()
+		  }).cloned().unwrap_or_else(|| keystore.write().generate::<AuthorityPair>().unwrap().public());
+	    let genesis_set=AuthoritySet{current_authorities:genesis_authorities, set_id:0,self_id:s_id};
 
 	backend.insert_aux(
 		&[
@@ -379,7 +387,7 @@ use runtime_primitives::traits::Zero;
 use state_machine::{
 	 ExecutionStrategy, //create_proof_check_backend,
 	 //ExecutionManager,  
-	merge_storage_proofs,
+	//merge_storage_proofs,
 };
 
 impl<B, E, Block: BlockT<Hash=H256>, RA> GenesisAuthoritySetProvider<Block> for Client<B, E, Block, RA>

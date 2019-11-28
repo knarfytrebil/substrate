@@ -43,7 +43,7 @@ use client::{
 use elections::VoteIndex;
 use finality_tracker::{DEFAULT_REPORT_LATENCY, DEFAULT_WINDOW_SIZE};
 use primitives::OpaqueMetadata;
-use sr_primitives::traits::{BlakeTwo256, Block as BlockT, NumberFor, StaticLookup};
+use sr_primitives::traits::{BlakeTwo256, Block as BlockT, NumberFor, StaticLookup,OpaqueKeys};
 use sr_primitives::transaction_validity::TransactionValidity;
 use sr_primitives::weights::Weight;
 use sr_primitives::{create_runtime_str, generic, impl_opaque_keys, key_types, ApplyResult}; //key_types
@@ -294,6 +294,7 @@ construct_runtime!(
 		Timestamp: timestamp::{Module, Call, Storage, Inherent},
 		Authorship: authorship::{Module, Call, Storage, Inherent},
 		Badger: srml_badger::{Module, Call, Storage, Event},
+		Session: session::{Module, Call, Storage, Event, Config<T>},
 		Keygen: srml_keygen::{Module, Call, Storage, Event,ValidateUnsigned},
 		Indices: indices,
 		Balances: balances,
@@ -321,6 +322,22 @@ impl transaction_payment::Trait for Runtime {
 	type WeightToFee = LinearWeightToFee<WeightFeeCoefficient>;
 	type FeeMultiplierUpdate = TargetedFeeAdjustment<TargetBlockFullness>;
 }
+
+parameter_types! {
+	pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(33);
+}
+impl session::Trait for Runtime {
+	type OnSessionEnding = Badger;
+	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
+	type ShouldEndSession = Badger;
+	type Event = Event;
+	type Keys = SessionKeys;
+	type ValidatorId = <Self as system::Trait>::AccountId;
+	type ValidatorIdOf = ();
+	type SelectInitialValidators = ();
+	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
+}
+
 
 /// The address format for describing accounts.
 pub type Address = <Indices as StaticLookup>::Source;
