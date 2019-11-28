@@ -436,7 +436,7 @@ pub struct RunCmd {
 	pub name: Option<String>,
 
 
-    #[structopt(long = "node-conf-file", value_name = "NODE_CONF_FILE")]
+        #[structopt(long = "node-conf-file", value_name = "NODE_CONF_FILE")]
 	pub nconffile: Option<String>,
 
 	/// Disable connecting to the Substrate telemetry server.

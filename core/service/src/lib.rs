@@ -107,7 +107,7 @@ pub struct Service<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> {
 	_telemetry_on_connect_sinks: Arc<Mutex<Vec<mpsc::UnboundedSender<()>>>>,
 	_offchain_workers: Option<Arc<TOc>>,
 	keystore: keystore::KeyStorePtr,
-  ln_bridge: Arc<LnBridge>,
+        ln_bridge: Arc<LnBridge>,
 	marker: PhantomData<TBl>,
 }
 
@@ -456,8 +456,8 @@ macro_rules! new_impl {
 			_telemetry: telemetry,
 			_offchain_workers: offchain_workers,
 			_telemetry_on_connect_sinks: telemetry_connection_sinks.clone(),
-			keystore,
-      ln_bridge,
+			keystore, 
+                        ln_bridge,
 			marker: PhantomData::<$block>,
 		})
 	}}
