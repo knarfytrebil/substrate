@@ -101,7 +101,7 @@ pub struct LnBridge {
 
 impl LnBridge {
   pub fn new(exit: Exit, conf_path: String) -> Self {
-    let settings = Settings::new(&String::from("./Settings.toml")).unwrap();
+    let settings = Settings::new(&conf_path).unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let executor = runtime.executor();
     let drone = Drone::new(executor);
