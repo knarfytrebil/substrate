@@ -100,7 +100,7 @@ pub struct LnBridge {
 }
 
 impl LnBridge {
-  pub fn new(exit: Exit) -> Self {
+  pub fn new(exit: Exit, conf_path: String) -> Self {
     let settings = Settings::new(&String::from("./Settings.toml")).unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let executor = runtime.executor();
