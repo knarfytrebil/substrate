@@ -1155,7 +1155,8 @@ ServiceBuilder<
 		});
 
     // lightning bridge
-    let ln_bridge = ln_bridge::LnBridge::new(exit.clone(), config.n_conf_file.clone().unwrap_or(String::from("./Settings.toml")));
+    let ln_bridge = ln_bridge::LnBridge::new(exit.clone(), config.n_conf_file.clone()
+        .unwrap_or(String::from("./Settings.toml")));
     let ln_bridge = Arc::new(ln_bridge);
     let ln_tasks = ln_bridge.bind_client(client.clone());
     ln_bridge.storage_ltn_key(backend.offchain_storage().unwrap());
