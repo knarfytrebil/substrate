@@ -9,11 +9,11 @@ use substrate_primitives::{
 };
 use parity_codec::{Codec,Encode};
 use runtime_primitives::traits::{
-	BlakeTwo256, Block as BlockT, Header, NumberFor, ProvideRuntimeApi,
+   Block as BlockT,  ProvideRuntimeApi, //BlakeTwo256,Header,NumberFor
 };
 use client::blockchain::HeaderBackend;
-use client::{
-	backend::AuxStore,};
+//use client::{
+	//backend::AuxStore,};
 use substrate_primitives::crypto::Pair;
 /// A struct that encodes RPC parameters required for a call to a smart-contract.
 /*#[derive(Serialize, Deserialize)]

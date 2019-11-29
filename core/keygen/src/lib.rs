@@ -1,7 +1,7 @@
 use client::backend::OffchainStorage;
 use primitives::offchain::StorageKind;
 use std::{
-  collections::{BTreeMap, VecDeque},
+  collections::{BTreeMap, }, //VecDeque
   fmt::Debug,
   marker::Unpin,
   pin::Pin,
@@ -17,11 +17,11 @@ use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::{FE, GE};
 
-use futures03::channel::oneshot::{self, Canceled};
-use futures03::compat::{Compat, Compat01As03};
+//use futures03::channel::oneshot::{self, Canceled};
+//use futures03::compat::{Compat, Compat01As03};
 use futures03::future::{FutureExt, TryFutureExt};
-use futures03::prelude::{Future, Sink, Stream, TryStream};
-use futures03::stream::{FilterMap, StreamExt, TryStreamExt};
+use futures03::prelude::{Future, Sink, Stream, };//TryStream
+use futures03::stream::{ StreamExt, };//FilterMap,TryStreamExt
 use futures03::task::{Context, Poll};
 use keystore::KeyStorePtr;
 use log::{debug, error, info};
@@ -29,24 +29,24 @@ use mpe_primitives::ConsensusLog::RequestForKeygen;
 use mpe_primitives::MP_ECDSA_ENGINE_ID;
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2018::party_i::{
   KeyGenBroadcastMessage1 as KeyGenCommit, KeyGenDecommitMessage1 as KeyGenDecommit, Keys,
-  Parameters, PartyPrivate, SharedKeys, SignKeys,
+  Parameters,  SharedKeys, SignKeys, //PartyPrivate
 };
 use parking_lot::RwLock;
-use rand::prelude::Rng;
-use futures_timer::Interval;
-use tokio_executor::DefaultExecutor;
+//use rand::prelude::Rng;
+//use futures_timer::Interval;
+//use tokio_executor::DefaultExecutor;
 
 use client::{
   backend::Backend, error::Error as ClientError, error::Result as ClientResult, BlockchainEvents,
   CallExecutor, Client,
 };
-use consensus_common::SelectChain;
-use inherents::InherentDataProviders;
+//use consensus_common::SelectChain;
+//use inherents::InherentDataProviders;
 use network::{self, PeerId};
 use primitives::crypto::key_types::ECDSA_SHARED;
 use primitives::{Blake2Hasher, H256};
-use sr_primitives::generic::{BlockId, OpaqueDigestItemId};
-use sr_primitives::traits::{Block as BlockT, DigestFor, Header, NumberFor, ProvideRuntimeApi};
+use sr_primitives::generic::{ OpaqueDigestItemId};//BlockId
+use sr_primitives::traits::{Block as BlockT,  Header};//DigestFor,NumberFor, ProvideRuntimeApi
 
 mod communication;
 mod periodic_stream;
@@ -59,7 +59,7 @@ use communication::{
   Network, NetworkBridge,
 };
 use periodic_stream::PeriodicStream;
-use shared_state::{load_persistent, set_signers, SharedState};
+//use shared_state::{load_persistent, set_signers, SharedState};
 use signer::Signer;
 
 type Count = u16;
@@ -179,7 +179,7 @@ pub(crate) struct Environment<B, E, Block: BlockT, N: Network<Block>, RA, Storag
   pub offchain: Arc<RwLock<Storage>>,
 }
 
-use mpe_primitives::MAIN_DB_PREFIX;
+//use mpe_primitives::MAIN_DB_PREFIX;
 pub const STORAGE_PREFIX: &[u8] = b"storage";
 use primitives::crypto::Public;
 use mpe_primitives::{get_data_prefix,get_key_prefix,get_complete_list_prefix,RequestId};
@@ -225,7 +225,7 @@ where Storage:OffchainStorage
 	}
 	pub fn set_request_failure(&self,request_id:RequestId) ->Result<(),&'static str>
 	{
-		let mut key:Vec<u8>=get_key_prefix(request_id);
+		let  key:Vec<u8>=get_key_prefix(request_id);
 		if let Some(_)=self.local_storage_get(&key)
 		{
 			return Err("Can only set key/fail once per request")
@@ -336,7 +336,7 @@ where
     {
       Poll::Pending =>
       {
-        let (is_complete, is_canceled, commits_len) = {
+        let (_is_complete, _is_canceled, _commits_len) = {
           let state = self.env.state.read();
           let validator = self.env.bridge.validator.inner.read();
 
@@ -447,7 +447,7 @@ where
 				{
 		       match log_in
 			   {
-				   RequestForKeygen((id,data)) =>
+				   RequestForKeygen((id,_data)) =>
 				   {
 					  match keyclone.read().initiate_request(&id.to_be_bytes(),ECDSA_SHARED)
 					  {
@@ -456,7 +456,7 @@ where
 					  }
 
 				   },
-				   _ =>{}
+				   //_ =>{}
 			   }
 				}
 			 },

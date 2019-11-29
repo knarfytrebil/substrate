@@ -1,3 +1,4 @@
+//! Module docs
 use rstd::vec::Vec;
 
 use codec::{Decode, Encode};
@@ -37,15 +38,20 @@ use threshold_crypto::{
 };
 
 
-
+/// Seed size
 pub const SEED_SIZE: usize = 32;
+
+/// Public key size
 pub const PK_SIZE: usize = 48;
+
+/// Signature size
 pub const SIG_SIZE: usize = 96;
 
-
+/// "Seed"
 #[cfg(feature = "full_crypto")]
 type Seed = [u8; SEED_SIZE];
 
+/// Public key
 #[derive(Clone, Encode, Decode, PassByInner)]
 pub struct Public(pub [u8; PK_SIZE]);
 
@@ -77,10 +83,14 @@ impl Default for Public {
 	}
 }
 
+
+/// Full Thresh-sig pair
 #[cfg(feature = "full_crypto")]
 #[derive(Clone)]
 pub struct Pair {
+	/// Public
 	pub public: PublicKey,
+	/// Secret key
 	pub secret: SecretKey,
 }
 
@@ -204,6 +214,8 @@ impl<'de> Deserialize<'de> for Public {
 	}
 }
 
+
+/// Hash impl
 #[cfg(feature = "full_crypto")]
 impl rstd::hash::Hash for Public {
 	fn hash<H: rstd::hash::Hasher>(&self, state: &mut H) {
@@ -211,6 +223,7 @@ impl rstd::hash::Hash for Public {
 	}
 }
 
+///  Signature
 #[derive(Encode, Decode, PassByInner)]
 pub struct Signature(pub [u8; SIG_SIZE]);
 
@@ -294,11 +307,14 @@ impl rstd::hash::Hash for Signature {
 }
 
 impl Signature {
+
+	/// Get sig from raw data
 	pub fn from_raw(data: [u8; SIG_SIZE]) -> Signature {
 		Signature(data)
 	}
 }
 
+/// Error in public key
 #[cfg(feature = "std")]
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum PublicError {
@@ -313,6 +329,8 @@ pub enum PublicError {
 }
 
 impl Public {
+
+	/// from raw bytes
 	pub fn from_raw(data: [u8; PK_SIZE]) -> Self {
 		Public(data)
 	}

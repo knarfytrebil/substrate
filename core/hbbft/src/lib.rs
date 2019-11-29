@@ -1,15 +1,15 @@
-use std::collections::BTreeMap;
-use std::fs::File;
+//use std::collections::BTreeMap;
+//use std::fs::File;
 use std::marker::{Send, Sync};
-use std::path::PathBuf;
+//use std::path::PathBuf;
 use std::pin::Pin;
-use std::str::FromStr;
+//use std::str::FromStr;
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc, time::Duration};
 use badger::crypto::{
-	PublicKey, PublicKeySet,  SecretKey, SecretKeyShare, //Signature,PublicKeyShare
+	 SecretKeyShare, //Signature,PublicKeyShare,PublicKey,SecretKeyPublicKeySet
   };
 
-use app_crypto::hbbft_thresh::Pair as HBPair;
+//use app_crypto::hbbft_thresh::Pair as HBPair;
 //use threshold_crypto::serde_impl::SerdeSecret;
 use bincode;
 use futures03::future::Future;
@@ -42,7 +42,7 @@ use runtime_primitives::{
 pub mod communication;
 use crate::communication::Network;
 use badger::ConsensusProtocol;
-use badger_primitives::{ AuthorityPair, HBBFT_AUTHORITIES_KEY};//AuthorityId
+use badger_primitives::{  HBBFT_AUTHORITIES_KEY};//AuthorityId,AuthorityPair
 use std::iter;
 
 use client::backend::Backend;
@@ -56,7 +56,6 @@ use client::{
 	blockchain::ProvideCache, error,
 };
 use communication::NetworkBridge;
-use communication::PeerIdW;
 use communication::TransactionSet;
 use communication::QHB;
 use consensus_common::block_import::BlockImport;
@@ -67,7 +66,7 @@ use consensus_common::import_queue::{
 pub use consensus_common::SyncOracle;
 use consensus_common::{self, BlockImportParams, BlockOrigin, ForkChoiceStrategy, SelectChain};
 use inherents::{InherentData, InherentDataProviders};
-use network::PeerId;
+//use network::PeerId;
 use runtime_primitives::traits::DigestFor;
 use substrate_primitives::{Blake2Hasher, ExecutionContext, H256,storage::StorageKey};
 use substrate_telemetry::{telemetry, CONSENSUS_INFO, CONSENSUS_WARN};
@@ -562,8 +561,8 @@ pub fn run_honey_badger<B, E, Block: BlockT<Hash = H256>, N, RA, SC, X, I, A>(
 	inherent_data_providers: InherentDataProviders,
 	selch: SC,
 	keystore: KeyStorePtr,
-	node_key:Option<String>,
-	dev_seed:Option<String>
+	_node_key:Option<String>,
+	_dev_seed:Option<String>
 ) -> ::client::error::Result<impl Future<Output = ()> + Send + Unpin>
 where
 	Block::Hash: Ord,
@@ -770,7 +769,7 @@ where
 					}
 				}
 				Err(e) => {
-					debug!("[{:?}] Invalid transaction: {}", pending.len(), e);
+					info!("[{:?}] Invalid transaction: {}", pending.len(), e);
 					//unqueue_invalid.push(pending.hash.clone());
 				}
 			}
@@ -864,8 +863,8 @@ where
 					"hash_previously" => ?header_hash
 				);
 				parent_hash = import_block.post_header().hash();
-				pnumber = *import_block.post_header().number();
-				parent_id = BlockId::hash(parent_hash);
+				//pnumber = *import_block.post_header().number();
+				//parent_id = BlockId::hash(parent_hash);
 				// go on to next block
 				{
 					let eh = import_block.header.parent_hash().clone();
@@ -893,8 +892,8 @@ where
 	//		}) ;
 
 	
-	use hex_literal::*;
-	use substrate_primitives::crypto::Pair;
+//	use hex_literal::*;
+//	use substrate_primitives::crypto::Pair;
 //	let ap:app_crypto::hbbft_thresh::Public=hex!["946252149ad70604cf41e4b30db13861c919d7ed4e8f9bd049958895c6151fab8a9b0b027ad3372befe22c222e9b733f"].into();
 
 //	let secr:SecretKey=bincode::deserialize(&keystore.read().key_pair_by_type::<AuthorityPair>(&ap.into(), app_crypto::key_types::HB_NODE).unwrap().to_raw_vec()).unwrap();

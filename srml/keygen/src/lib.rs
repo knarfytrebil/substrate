@@ -160,7 +160,7 @@ decl_module! {
   pub struct Module<T: Trait> for enum Call where origin: T::Origin {
     fn deposit_event() = default;
 
-    fn set_test(origin)
+    fn set_test(_origin)
     {
        print("Offchain ONCHAIN");
       <Self as Store>::Test::put(10);
@@ -341,7 +341,7 @@ impl<T: Trait> srml_support::unsigned::ValidateUnsigned for Module<T> {
 
 		} else {
 
-     if let  Call::report_result(res, signature)= call
+     if let  Call::report_result(_res, signature)= call
      {
        	return Ok(ValidTransaction {
 				priority: 0,

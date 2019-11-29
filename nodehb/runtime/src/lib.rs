@@ -26,7 +26,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use rstd::prelude::*;
 
-use badger_primitives::AuthorityId as BadgerId;
+//use badger_primitives::AuthorityId as BadgerId;
 use badger_primitives::AuthorityList as BadgerList;
 pub use contracts;
 pub use contracts::Gas;
@@ -46,7 +46,7 @@ use primitives::OpaqueMetadata;
 use sr_primitives::traits::{BlakeTwo256, Block as BlockT, NumberFor, StaticLookup,OpaqueKeys};
 use sr_primitives::transaction_validity::TransactionValidity;
 use sr_primitives::weights::Weight;
-use sr_primitives::{create_runtime_str, generic, impl_opaque_keys, key_types, ApplyResult}; //key_types
+use sr_primitives::{create_runtime_str, generic, impl_opaque_keys,  ApplyResult}; //key_types
 #[cfg(any(feature = "std", test))]
 use version::NativeVersion;
 use version::RuntimeVersion;
@@ -66,7 +66,7 @@ pub use timestamp::Call as TimestampCall;
 
 /// Implementations of some helper traits passed into runtime modules as associated types.
 pub mod impls;
-use impls::{Author, CurrencyToVoteHandler, LinearWeightToFee, TargetedFeeAdjustment};
+use impls::{  LinearWeightToFee, TargetedFeeAdjustment};//Author,CurrencyToVoteHandler
 
 /// Constant values used within the runtime.
 pub mod constants;

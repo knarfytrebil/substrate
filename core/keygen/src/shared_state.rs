@@ -17,11 +17,11 @@ use codec::{Decode, Encode};
 //use consensus_common::SelectChain;
 //use futures::{future::Loop as FutureLoop, prelude::*, stream::Fuse, sync::mpsc};
 //use inherents::InherentDataProviders;
-use log::{debug, error, info, warn};
-use network::{self, PeerId};
+//use log::{debug, error, info, warn};
+use network::{self, };// PeerId};
 //use parking_lot::RwLock;
-use sr_primitives::generic::BlockId;
-use sr_primitives::traits::{Block as BlockT, DigestFor, NumberFor, ProvideRuntimeApi};
+//use sr_primitives::generic::BlockId;
+//use sr_primitives::traits::{Block as BlockT, DigestFor, NumberFor, ProvideRuntimeApi};
 
 const SIGNER_SET_KEY: &[u8] = b"multi_ecdsa_signers";
 

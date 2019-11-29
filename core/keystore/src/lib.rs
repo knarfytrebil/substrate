@@ -139,7 +139,7 @@ impl Store {
 		Ok(obj)
 	}
 
-	//remove aux data
+	///removes aux data
 	pub fn delete_aux(&self, key_type: KeyTypeId, public: &[u8])-> Result<()> 
 	{
 		let path=self.key_aux_file_path(public, key_type);
@@ -311,7 +311,8 @@ impl Store {
 		buf
 	}
 	
-	fn request_exists(&self,request_id: &[u8],key_type: KeyTypeId) -> bool
+	/// Check if request exists
+	pub fn request_exists(&self,request_id: &[u8],key_type: KeyTypeId) -> bool
 	{
 		self.key_request_file_path(request_id,key_type).exists()
 	}

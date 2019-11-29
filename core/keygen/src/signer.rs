@@ -1,38 +1,38 @@
 use std::{
 	collections::VecDeque,
-	marker::{PhantomData, Unpin},
+	marker::{ Unpin},//PhantomData
 	pin::Pin,
-	str::FromStr,
+	//str::FromStr,
 	sync::Arc,
 };
 
-use codec::{Decode, Encode};
-use curv::GE;
+//use codec::{Decode, Encode};
+//use curv::GE;
 use client::backend::OffchainStorage;
 
-use futures03::channel::mpsc;
-use futures03::prelude::{Future, Sink, Stream, TryStream};
-use futures03::stream::{FilterMap, StreamExt, TryStreamExt};
+//use futures03::channel::mpsc;
+use futures03::prelude::{Future, Sink, Stream, };//TryStream
+use futures03::stream::{ StreamExt, }; //FilterMap, TryStreamExt
 use futures03::task::{Context, Poll};
 
-use log::{debug, error, info, warn};
+use log::{ error, info, warn};//debug, warn
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2018::party_i::{Keys, Parameters};
-use rand::prelude::Rng;
+//use rand::prelude::Rng;
 
 use client::{
-	backend::Backend, error::Error as ClientError, error::Result as ClientResult, BlockchainEvents,
-	CallExecutor, Client,
+	backend::Backend,  
+	CallExecutor, Client, //error::Error as ClientError, BlockchainEvents,error::Result as ClientResult, 
 };
-use consensus_common::SelectChain;
-use inherents::InherentDataProviders;
+//use consensus_common::SelectChain;
+//use inherents::InherentDataProviders;
 use network::PeerId;
 use primitives::{Blake2Hasher, H256};
-use sr_primitives::generic::BlockId;
-use sr_primitives::traits::{Block as BlockT, NumberFor, ProvideRuntimeApi};
+//use sr_primitives::generic::BlockId;
+use sr_primitives::traits::{Block as BlockT, }; //NumberFor, ProvideRuntimeApi
 
 use super::{
 	ConfirmPeersMessage, Environment, Error, GossipMessage, KeyGenMessage, MessageWithSender,
-	Network, PeerIndex, SignMessage,
+	Network, PeerIndex, // SignMessage,
 };
 
 struct Buffered<Item, S>
@@ -75,14 +75,14 @@ where
 			Poll::Ready(r) => {
 				match Pin::new(&mut self.inner).poll_flush(cx) {
 					Poll::Pending => return Poll::Pending,
-					Poll::Ready(r) => {}
+					Poll::Ready(_r) => {}
 				}
 				Poll::Ready(r)
 			}
 			Poll::Pending => {
 				match Pin::new(&mut self.inner).poll_flush(cx) {
 					Poll::Pending => return Poll::Pending,
-					Poll::Ready(r) => {}
+					Poll::Ready(_r) => {}
 				}
 				Poll::Pending
 			}
@@ -199,7 +199,7 @@ where
 		if res.is_err() {
 			println!("{:?} \n {:?} \n {:?}", secret_shares, vsss, res);
 			panic!("ss error of {:?}", key.party_index);
-			return;
+		//	return;
 		}
 
 		let (shared_keys, proof) = res.unwrap();
@@ -228,7 +228,7 @@ where
 		let players = self.env.config.players;
 
 		match cpm {
-			ConfirmPeersMessage::Confirming(from_index) => {
+			ConfirmPeersMessage::Confirming(_from_index) => {
 				println!("recv confirming msg");
 				// let sender = sender.clone().unwrap();
 
@@ -433,7 +433,7 @@ where
 		match msg {
 			GossipMessage::ConfirmPeers(cpm, all_peers_hash) => {
 				let validator = self.env.bridge.validator.inner.read();
-				let our_hash = validator.get_peers_hash();
+				let _our_hash = validator.get_peers_hash();
 
 				println!("cpm msg local state {:?}", validator.local_state());
 

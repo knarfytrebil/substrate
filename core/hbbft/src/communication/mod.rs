@@ -3,7 +3,7 @@ use badger::queueing_honey_badger::QueueingHoneyBadger;
 use badger::sender_queue::{Message as BMessage, SenderQueue};
 use badger::sync_key_gen::{Ack, AckFault, AckOutcome, Part, PartOutcome, PubKeyMap, SyncKeyGen};
 use keystore::KeyStorePtr;
-use runtime_primitives::app_crypto::RuntimeAppPublic;
+//use runtime_primitives::app_crypto::RuntimeAppPublic;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 //use std::convert::TryInto;
 use std::marker::PhantomData;
@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 //use badger::dynamic_honey_badger::KeyGenMessage::Ack;
 use crate::aux_store::BadgerPersistentData;
-use badger::crypto::{PublicKey, PublicKeySet,  SecretKey, SecretKeyShare, Signature};//PublicKeyShare
+use badger::crypto::{PublicKey, PublicKeySet,  SecretKey, SecretKeyShare, };//PublicKeyShare, Signature
 use badger::{ConsensusProtocol, CpStep, NetworkInfo, Target};
 use futures03::channel::{mpsc, oneshot};
 use futures03::prelude::*;
@@ -35,7 +35,7 @@ use network::consensus_gossip::ValidatorContext;
 use network::PeerId;
 use network::{consensus_gossip as network_gossip, NetworkService};
 use network_gossip::ConsensusMessage;
-use runtime_primitives::app_crypto::hbbft_thresh::Public as bPublic;
+//use runtime_primitives::app_crypto::hbbft_thresh::Public as bPublic;
 use runtime_primitives::traits::{Block as BlockT, Hash as HashT, Header as HeaderT};
 use substrate_primitives::crypto::Pair;
 use substrate_telemetry::{telemetry, CONSENSUS_DEBUG};
@@ -149,7 +149,7 @@ where
   D: ConsensusProtocol<NodeId = NodeId>, //specialize to avoid some of the confusion
   D::Message: Serialize + DeserializeOwned,
 {
-  id: PeerId,
+  //id: PeerId,
   node_id: NodeId,
   algo: D,
   main_rng: OsRng,
@@ -251,8 +251,6 @@ pub enum SyncKeyGenMessage
   Ack(Ack),
 }
 
-use std::error::Error as OtherError;
-use std::fmt::Display;
 
 
 impl<B: BlockT> BadgerStateMachine<B, QHB>
@@ -261,8 +259,8 @@ impl<B: BlockT> BadgerStateMachine<B, QHB>
     keystore: KeyStorePtr, self_peer: PeerId, batch_size: u64, persist: BadgerPersistentData,
   ) -> BadgerStateMachine<B, QHB>
   {
-    let mut ap: AuthorityPair;
-    let mut is_ob: bool;
+    let  ap: AuthorityPair;
+    let  is_ob: bool;
 
     {
       let aset = persist.authority_set.inner.read();
@@ -416,6 +414,7 @@ impl<B: BlockT> BadgerStateMachine<B, QHB>
     {
       let mut rng = rand::rngs::OsRng::new().expect("Could not open OS random number generator.");
       let secr: SecretKey = bincode::deserialize(&self.cached_origin.as_ref().unwrap().to_raw_vec()).unwrap();
+      info!("Our secret key : {:?} pub: {:?}",&secr,&secr.public_key());
       let thresh = badger::util::max_faulty(aset.current_authorities.len());
       let val_pub_keys: PubKeyMap<NodeId> = Arc::new(
         aset
@@ -442,6 +441,7 @@ impl<B: BlockT> BadgerStateMachine<B, QHB>
           })
           .collect(),
       );
+      info!("VAL_PUB {:?} {:?}",&val_pub_keys,&self.config.my_peer_id);
       let (skg, part) = SyncKeyGen::new(
         self.config.my_peer_id.clone().into(),
         secr,
@@ -628,6 +628,7 @@ impl<B: BlockT> BadgerStateMachine<B, QHB>
             return (SAction::QueueRetry(0), Vec::new());
           }
         };
+        info!("Originator: {:?}, Peer: {:?}",&wkgen.originator,&orid);
         if let BadgerState::KeyGen(ref mut step) = &mut self.state
         {
           let k_message: SyncKeyGenMessage = match bincode::deserialize(&wkgen.data)
@@ -695,12 +696,16 @@ impl<B: BlockT> BadgerStateMachine<B, QHB>
                   if step.keygen.count_complete() == num_auth
                   {
                     info!("Initial keygen ready, generating... ");
+                    info!("Pub keys: {:?}",step.keygen.public_keys());
                     let (kset, shr) = step.keygen.generate().expect("Initial key generation failed!");
                    
                     let aux=BadgerAuxCrypto{
                       secret_share: match shr
                       {
-                          Some(ref sec) => Some(SerdeSecret(sec.clone())),
+                          Some(ref sec) => {
+                            info!("Gensec {:?}",sec.public_key_share());
+                            Some(SerdeSecret(sec.clone()))},
+
                           None =>None
                       },
                      key_set: kset.clone(),
@@ -813,7 +818,7 @@ impl<B: BlockT> BadgerStateMachine<B, QHB>
     }
   }
   pub fn process_message(
-    &mut self, who: &PeerId, mut data: &[u8],
+    &mut self, _who: &PeerId, mut data: &[u8],
   ) -> (SAction, Vec<(LocalTarget, GossipMessage)>, Option<GossipMessage>)
   {
     match GossipMessage::decode(&mut data)
@@ -838,7 +843,7 @@ impl<B: BlockT> BadgerStateMachine<B, QHB>
     }
   }
   pub fn process_and_replay(
-    &mut self, who: &PeerId, mut data: &[u8],
+    &mut self, who: &PeerId,  data: &[u8],
   ) -> (Vec<(SAction, Option<GossipMessage>)>, Vec<(LocalTarget, GossipMessage)>)
   {
     let mut acc: Vec<(LocalTarget, GossipMessage)> = Vec::new();
@@ -945,12 +950,22 @@ where
       Ok(key) => bincode::deserialize(&key.to_raw_vec()).expect("Stored key should be correct"),
       Err(_) => panic!("SHould really have key at this point"),
     };
-    let vset: Vec<NodeId> = validator_set
+    let mut vset: Vec<NodeId> = validator_set
       .iter()
       .cloned()
-      .map(|x| (*peers.inverse.get(&x).expect("mapped")).clone().into())
-      .collect();
+      .map(|x| 
+        {
+        if x==auth_id {
+          self_id.clone().into()
+        }
+        else
+        {  Into::<NodeId>::into(peers.inverse.get(&x).expect("All auths should be known").clone()) } }
 
+        
+      )
+      .collect();
+     vset.sort();
+  
     let ni = NetworkInfo::<D::NodeId>::new(self_id.clone().into(), sks, (pkset).clone(), vset);
     //let num_faulty = hbbft::util::max_faulty(indices.len());
     /*let peer_ids: Vec<_> = ni
@@ -965,7 +980,7 @@ where
         (nid.clone().into(), (*auth).clone().into())
       })
       .collect();
-
+    
     let dhb = DynamicHoneyBadger::builder().build(ni, secr, Arc::new(val_map));
     let (qhb, qhb_step) = QueueingHoneyBadger::builder(dhb)
       .batch_size(batch_size)
@@ -991,7 +1006,7 @@ where
     let outputs = step.output.into_iter().collect();
     info!("BaDGER!! Initializing node");
     let  node = BadgerNode {
-      id: self_id.clone(),
+      //id: self_id.clone(),
       node_id: self_id.clone().into(),
       algo: sq,
       main_rng: rng,
@@ -1370,7 +1385,7 @@ impl<Block: BlockT> network_gossip::Validator<Block> for BadgerGossipValidator<B
       self.flush_message_either::<ShutUp>(&mut accumulated_output, None, &mut Some(context));
     }
     info!("Flushed");
-    if (keep)
+    if keep
     {
       ret = network_gossip::ValidationResult::ProcessAndKeep(topic);
     }

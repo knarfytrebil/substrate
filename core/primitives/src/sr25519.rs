@@ -510,9 +510,12 @@ impl TraitPair for Pair {
 			Ok(pk) => 
 			{
 				info!("sr pk: {:?} {:?} {:?}",&pk,&message.as_ref(),&sig);
-			  pk.verify_simple_preaudit_deprecated(
+			 let res= pk.verify_simple_preaudit_deprecated(
 				SIGNING_CTX, message.as_ref(), &sig,
-			).is_ok()
+			).is_ok();
+			info!("Verification result :{:?}",res);
+			res
+
 		   }   ,
 			Err(_) => false,
 		}

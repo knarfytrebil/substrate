@@ -197,6 +197,7 @@ impl<B: BlockT + 'static, S: NetworkSpecialization<B>, H: ExHashT> NetworkWorker
 			protocol::ProtocolConfig {
 				roles: params.roles,
 				max_parallel_downloads: params.network_config.max_parallel_downloads,
+				propagate_extr:params.network_config.propagate_extr
 			},
 			params.chain,
 			params.on_demand.as_ref().map(|od| od.checker().clone())

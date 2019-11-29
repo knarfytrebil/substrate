@@ -111,6 +111,7 @@ use runtime_io::misc::print_utf8;
 	   if who != binding.data.bound_account
 	   {
 		print_utf8(b"ERROR: Invalid account trying to use binder");
+		//return Ok(())
 		return Err("Invalid account trying to use binder".into());
 	   }
 		 if Self::check_either_present(&who,&binding.data.self_pub_key)

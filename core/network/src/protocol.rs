@@ -386,6 +386,8 @@ pub struct ProtocolConfig {
 	pub roles: Roles,
 	/// Maximum number of peers to ask the same blocks in parallel.
 	pub max_parallel_downloads: u32,
+	/// Whether extr should be propagated directly
+	pub propagate_extr:bool,
 }
 
 impl Default for ProtocolConfig {
@@ -393,6 +395,7 @@ impl Default for ProtocolConfig {
 		ProtocolConfig {
 			roles: Roles::FULL,
 			max_parallel_downloads: 5,
+			propagate_extr:true
 		}
 	}
 }
@@ -1773,10 +1776,12 @@ Protocol<B, S, H> {
 		while let Ok(Async::Ready(_)) = self.tick_timeout.poll() {
 			self.tick();
 		}
-
+		if(self.config.propagate_extr)
+		{
 		while let Ok(Async::Ready(_)) = self.propagate_timeout.poll() {
 			self.propagate_extrinsics();
 		}
+     	}
 
 		for (id, r) in self.sync.block_requests() {
 			send_request(

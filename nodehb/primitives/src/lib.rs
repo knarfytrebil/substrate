@@ -28,8 +28,8 @@ use codec::{Decode, Encode};
 
 use rstd::prelude::Vec;
 
-#[cfg(feature = "std")]
-use serde::{Deserialize, Serialize};
+//#[cfg(feature = "std")]
+//use serde::{Deserialize, Serialize};
 
 /// An index to a block.
 pub type BlockNumber = u64;

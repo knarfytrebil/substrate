@@ -1,8 +1,8 @@
 use codec::{Decode, Encode};
 //use log::{error, info, trace, warn};
-use serde::{Deserialize, Serialize};
+//use serde::{Deserialize, Serialize};
 use std::{
-	collections::VecDeque,
+	//collections::VecDeque,
 	marker::PhantomData,
 	str::FromStr,
 	time::{Duration, Instant},
@@ -15,7 +15,7 @@ use sr_primitives::traits::{Block as BlockT};
 use super::{
 	message::{ConfirmPeersMessage, KeyGenMessage, SignMessage},
 	peer::{PeerInfo, PeerState, Peers},
-	string_topic,
+	//string_topic,
 };
 
 const REBROADCAST_AFTER: Duration = Duration::from_secs(30);
@@ -232,8 +232,8 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 
 	fn validate(
 		&self,
-		context: &mut dyn ValidatorContext<Block>,
-		who: &PeerId,
+		_context: &mut dyn ValidatorContext<Block>,
+		_who: &PeerId,
 		mut data: &[u8],
 	) -> network_gossip::ValidationResult<Block::Hash> {
 		let gossip_msg = GossipMessage::decode(&mut data);
@@ -304,7 +304,7 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 	}
 
 	fn message_expired<'a>(&'a self) -> Box<dyn FnMut(Block::Hash, &[u8]) -> bool + 'a> {
-		Box::new(move |topic, mut data| {
+		Box::new(move |_topic, mut data| {
 			let inner = self.inner.read();
 			let is_complete = inner.is_local_complete();
 			let is_canceled = inner.is_local_canceled();
@@ -343,7 +343,7 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 						KeyGenMessage::Proof(from, _) => {
 							println!("proof from {:?}", from);
 						}
-						_ => {}
+						// _ => {}
 					},
 					_ => {}
 				}

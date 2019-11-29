@@ -27,6 +27,8 @@ use crate::crypto::KeyTypeId;
 pub const ED25519: KeyTypeId = KeyTypeId(*b"ed25");
 /// Key type for generic Sr 25519 key.
 pub const SR25519: KeyTypeId = KeyTypeId(*b"sr25");
+
+/// Honey badger node key
 pub const HB_NODE: KeyTypeId = KeyTypeId(*b"hbnd");
 
 /// A keystore implementation usable in tests.

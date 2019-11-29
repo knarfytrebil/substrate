@@ -87,6 +87,7 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
 #[cfg(feature = "std")]
 use serde::Serialize;
@@ -901,6 +902,7 @@ impl<T: Trait> Debug for CheckNonce<T> {
 	}
 }
 
+
 impl<T: Trait> SignedExtension for CheckNonce<T> {
 	type AccountId = T::AccountId;
 	type Call = T::Call;
@@ -916,6 +918,8 @@ impl<T: Trait> SignedExtension for CheckNonce<T> {
 		_info: DispatchInfo,
 		_len: usize,
 	) -> Result<(), ApplyError> {
+		#[cfg(feature = "std")]
+		print!("pre_dispatch {:?}\n",self.0);
 		let expected = <AccountNonce<T>>::get(who);
 		if self.0 != expected {
 			return Err(

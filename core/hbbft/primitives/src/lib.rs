@@ -45,7 +45,7 @@ pub const HBBFT_AUTHORITIES_MAP_KEY: &'static [u8] = b":honey_badger_auth_map";
 pub type AuthorityList = Vec<AuthorityId>;
 
 pub type SetId = u32;
-use codec::{self as codec, Decode, Encode, Error,Codec};
+use codec::{self as codec, Decode, Encode, }; //Error, Codec
 
 
 
@@ -107,7 +107,7 @@ where AccountId:Encode+Decode+core::fmt::Debug,
 }
 
 #[derive(Decode, Encode, PartialEq, Eq, Clone,RuntimeDebug)]
-pub struct SignedAccountBinding<AccountId>
+pub struct  SignedAccountBinding<AccountId>
 where AccountId:Encode+Decode+core::fmt::Debug
 {
 	pub data:AccountBinding<AccountId>,

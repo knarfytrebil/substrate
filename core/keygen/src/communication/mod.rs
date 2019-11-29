@@ -1,20 +1,20 @@
-use std::{future, marker::Unpin, pin::Pin, sync::Arc};
+use std::{ marker::Unpin, pin::Pin, sync::Arc};//future
 
 use codec::{Decode, Encode};
-use futures::prelude::{Sink as Sink01, Stream as Stream01};
+//use futures::prelude::{Sink as Sink01, Stream as Stream01};
 use futures03::channel::oneshot::{self, Canceled};
-use futures03::compat::{Compat, Compat01As03};
+//use futures03::compat::{Compat, Compat01As03};
 use futures03::future::FutureExt;
-use futures03::prelude::{Future, Sink, Stream, TryStream};
-use futures03::sink::SinkExt;
-use futures03::stream::{FilterMap, StreamExt, TryStreamExt};
+use futures03::prelude::{ Sink, Stream, };//Future,TryStream
+//use futures03::sink::SinkExt;
+use futures03::stream::{ StreamExt};//FilterMap,TryStreamExt
 use futures03::task::{Context, Poll};
-use log::{error, info, trace};
+use log::{ trace}; //error,info
 
 use network::{consensus_gossip as network_gossip, NetworkService, PeerId};
 use network_gossip::{ConsensusMessage, TopicNotification};
 use sr_primitives::traits::{
-	Block as BlockT, DigestFor, Hash as HashT, Header as HeaderT, NumberFor, ProvideRuntimeApi,
+	Block as BlockT,  Hash as HashT, Header as HeaderT,//DigestFor, NumberFor, ProvideRuntimeApi,
 };
 
 use mpe_primitives::MP_ECDSA_ENGINE_ID;
@@ -26,7 +26,7 @@ mod peer;
 use crate::Error;
 
 use gossip::{GossipMessage, GossipValidator, MessageWithReceiver, MessageWithSender};
-use message::{ConfirmPeersMessage, KeyGenMessage, SignMessage};
+//use message::{ConfirmPeersMessage, KeyGenMessage, SignMessage};
 
 pub struct NetworkStream<R> {
 	inner: Option<R>,
