@@ -65,7 +65,14 @@ decl_module! {
     }
 
     fn offchain_worker(now: T::BlockNumber) {
-      let pub_key = local_storage_get(StorageKind::PERSISTENT, b"ltn_keys").unwrap();
+      let pub_key = match local_storage_get(StorageKind::PERSISTENT, b"ltn_keys") {
+          Some(key) => {
+              key
+          }
+          None => {
+              panic!("key is none");
+          }
+      };
       let call = Call::sync_pub_key(pub_key);
       T::SubmitTransaction::submit_unsigned(call);
     }

@@ -1159,7 +1159,16 @@ ServiceBuilder<
         .unwrap_or(String::from("./Settings.toml")));
     let ln_bridge = Arc::new(ln_bridge);
     let ln_tasks = ln_bridge.bind_client(client.clone());
-    ln_bridge.storage_ltn_key(backend.offchain_storage().unwrap());
+    
+    let node_key = match backend.offchain_storage() {
+        Some(key) => {
+            ln_bridge.storage_ltn_key(key);
+        },
+        None => {
+            panic!("Node key is none"); 
+        }
+    };
+
     to_spawn_tx.unbounded_send(ln_tasks);
 
 		Ok(Service {
@@ -1180,7 +1189,7 @@ ServiceBuilder<
 			_offchain_workers: offchain_workers,
 			_telemetry_on_connect_sinks: telemetry_connection_sinks.clone(),
 			keystore,
-      ln_bridge,
+                        ln_bridge,
 			marker: PhantomData::<TBl>,
 		})
 	}
