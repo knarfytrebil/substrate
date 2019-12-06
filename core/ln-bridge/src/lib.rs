@@ -55,7 +55,8 @@ pub type Executor = tokio::runtime::TaskExecutor;
 pub type Task = Box<dyn Future01<Item = (), Error = ()> + Send>;
 // use inherents::{InherentDataProviders, InherentIdentifier};
 // pub const INHERENT_LN_ID: InherentIdentifier = *b"ltn_data";
-pub const STORAGE_PREFIX: &[u8] = b"lightning";
+// pub const STORAGE_PREFIX: &[u8] = b"lightning";
+pub const STORAGE_PREFIX: &[u8] = b"storage";
 
 #[derive(Clone)]
 pub struct Drone {
@@ -100,8 +101,8 @@ pub struct LnBridge {
 }
 
 impl LnBridge {
-  pub fn new(exit: Exit, conf_path: String) -> Self {
-    let settings = Settings::new(&conf_path).unwrap();
+  pub fn new(exit: Exit, conf_file: String) -> Self {
+    let settings = Settings::new(&conf_file).unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let executor = runtime.executor();
     let drone = Drone::new(executor);

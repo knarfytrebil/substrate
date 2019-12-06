@@ -284,6 +284,11 @@ impl finality_tracker::Trait for Runtime {
 	type ReportLatency = ReportLatency;
 }
 
+impl lightning::Trait for Runtime {
+  type Call = Call;
+  type SubmitTransaction = SubmitTransaction;
+}
+
 construct_runtime!(
 	pub enum Runtime where
 		Block = Block,
@@ -301,6 +306,7 @@ construct_runtime!(
 		Contracts: contracts,
 		FinalityTracker: finality_tracker::{Module, Call, Inherent},
 		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
+                Lightning: lightning::{Module, Call, Storage, ValidateUnsigned},
 		Sudo: sudo,
 	}
 );

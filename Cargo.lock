@@ -1722,6 +1722,7 @@ version = "2.0.0"
 dependencies = [
  "hb-node-primitives 2.0.0",
  "integer-sqrt 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ln-primitives 2.0.0",
  "parity-scale-codec 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1739,6 +1740,7 @@ dependencies = [
  "srml-finality-tracker 2.0.0",
  "srml-indices 2.0.0",
  "srml-keygen 2.0.0",
+ "srml-lightning 0.1.0",
  "srml-membership 2.0.0",
  "srml-randomness-collective-flip 2.0.0",
  "srml-session 2.0.0",

@@ -1,0 +1,7 @@
+[Lightning]
+port = 9737
+# lndata = "/home/jie.zhu/workspace/pylon/rust-lightning-bitcoinrpc/server/ln/data_1"
+lndata = "/home/yuan.yao/workspace/ln_data_4"
+[Bitcoind]
+rpc_url = "admin1:123@127.0.0.1:19011"
+

@@ -19,6 +19,7 @@ sr-primitives = { path = "../../core/sr-primitives", default-features = false }
 offchain-primitives = { package = "substrate-offchain-primitives", path = "../../core/offchain/primitives", default-features = false }
 badger-primitives = { package = "substrate-badger-primitives", path = "../../core/hbbft/primitives", default-features = false}
 hb-node-primitives = { path = "../primitives", default-features = false }
+ln-primitives = { path = "../../core/ln-bridge/primitives", default-features = false }
 
 # core dependencies
 client = { package = "substrate-client", path = "../../core/client", default-features = false }
@@ -50,6 +51,7 @@ transaction-payment = { package = "srml-transaction-payment", path = "../../srml
 
 srml-badger = { package = "srml-badger", path = "../../srml/hbbft", default-features = false }
 srml-keygen = { package = "srml-keygen", path = "../../srml/keygen", default-features = false }
+lightning = { package = "srml-lightning", path = "../../srml/lightning", default-features = false }
 
 [build-dependencies]
 wasm-builder-runner = { package = "substrate-wasm-builder-runner", version = "1.0.4", path = "../../core/utils/wasm-builder-runner" }
@@ -89,5 +91,6 @@ std = [
 	"randomness-collective-flip/std",
 	"transaction-payment/std",
 	"system-rpc-runtime-api/std",
-	"contracts-rpc-runtime-api/std"
+	"contracts-rpc-runtime-api/std",
+    "lightning/std",
 ]

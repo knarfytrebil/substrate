@@ -15,7 +15,6 @@ use ln_primitives::{
   Account, Tx
 };
 use primitives::offchain::StorageKind;
-use runtime_io::offchain::local_storage_get;
 
 pub trait Trait: system::Trait {
   type Call: From<Call<Self>>;
@@ -28,12 +27,6 @@ decl_storage! {
     PubKey: Vec<u8>;
   }
 }
-
-// decl_event!(
-//   pub enum Event {
-//     Light
-//   }
-// );
 
 decl_module! {
   pub struct Module<T: Trait> for enum Call where origin: T::Origin {
@@ -61,20 +54,12 @@ decl_module! {
       PubKey::put(key);
     }
 
-    fn on_finalize(block_number: T::BlockNumber) {
-    }
-
     fn offchain_worker(now: T::BlockNumber) {
-      // let pub_key = match local_storage_get(StorageKind::PERSISTENT, b"ltn_keys") {
-      //     Some(key) => {
-      //         key
-      //     }
-      //     None => {
-      //         panic!("key is none");
-      //     }
-      // };
-      // let call = Call::sync_pub_key(pub_key);
-      // T::SubmitTransaction::submit_unsigned(call);
+      let local_pub_key = runtime_io::offchain::local_storage_get(StorageKind::PERSISTENT, b"ltn_keys").unwrap();
+      if local_pub_key != PubKey::get() {
+        let call = Call::sync_pub_key(local_pub_key);
+        T::SubmitTransaction::submit_unsigned(call);
+      }
     }
   }
 }
@@ -92,7 +77,7 @@ impl<T: Trait> support::unsigned::ValidateUnsigned for Module<T> {
       Ok(ValidTransaction {
         priority: 0,
 				requires: vec![],
-        provides: vec![("abcdefg").encode()],
+        provides: vec![b"sync_lightning_pub_key".encode()],
 				// provides: vec![(current_session, ()).encode()],
 				longevity: TransactionLongevity::max_value(),
 				propagate: true,
