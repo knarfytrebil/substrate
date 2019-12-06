@@ -842,7 +842,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		} = import_block;
 
 		assert!(justification.is_some() && finalized || justification.is_none());
-
+        info!("Justfication: {:?}",&justification);
 		let parent_hash = header.parent_hash().clone();
 		let mut enact_state = true;
 
@@ -925,6 +925,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		// the block is lower than our last finalized block so it must revert
 		// finality, refusing import.
 		if *import_headers.post().number() <= info.finalized_number {
+			info!("Importing block with lower finalized number {:?}:{:?}  {:?}",info.finalized_number,import_headers.post().number(),&hash);
 			return Err(error::Error::NotInFinalizedChain);
 		}
 
@@ -1525,6 +1526,7 @@ impl<'a, B, E, Block, RA> consensus::BlockImport<Block> for &'a Client<B, E, Blo
 		import_block: BlockImportParams<Block>,
 		new_cache: HashMap<CacheKeyId, Vec<u8>>,
 	) -> Result<ImportResult, Self::Error> {
+		info!("IMPORT_BLOCK called");
 		self.lock_import_and_run(|operation| {
 			self.apply_block(operation, import_block, new_cache)
 		}).map_err(|e| {

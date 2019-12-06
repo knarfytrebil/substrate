@@ -216,6 +216,7 @@ impl Store {
 		public: &Pair::Public,
 		key_type: KeyTypeId,
 	) -> Result<Pair> {
+	//	print!("Additional: {:?} \n",&self.additional);
 		if let Some(pair) = self.get_additional_pair(public, key_type)? {
 			return Ok(pair)
 		}

@@ -392,6 +392,41 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 		})
 	}
 
+		/// Defines which import queue to use.
+		pub fn with_import_queue_key<UImpQu>(
+			self,
+			builder: impl FnOnce(&Configuration<TCfg, TGen, TCSExt>, Arc<TCl>, Option<TSc>, Arc<TExPool>,Arc<RwLock<Keystore>>)
+				-> Result<UImpQu, Error>
+		) -> Result<ServiceBuilder<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, UImpQu, TFprb, TFpp,
+				TNetP, TExPool, TRpc, Backend>, Error>
+		where TSc: Clone {
+			let import_queue = builder(
+				&self.config,
+				self.client.clone(),
+				self.select_chain.clone(),
+				self.transaction_pool.clone(),
+				self.keystore.clone()
+			)?;
+	
+			Ok(ServiceBuilder {
+				config: self.config,
+				client: self.client,
+				backend: self.backend,
+				keystore: self.keystore,
+				fetcher: self.fetcher,
+				select_chain: self.select_chain,
+				import_queue,
+				finality_proof_request_builder: self.finality_proof_request_builder,
+				finality_proof_provider: self.finality_proof_provider,
+				network_protocol: self.network_protocol,
+				transaction_pool: self.transaction_pool,
+				rpc_extensions: self.rpc_extensions,
+				remote_backend: self.remote_backend,
+				dht_event_tx: self.dht_event_tx,
+				marker: self.marker,
+			})
+		}
+
 	/// Defines which network specialization protocol to use.
 	pub fn with_network_protocol<UNetP>(
 		self,

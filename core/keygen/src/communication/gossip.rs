@@ -1,5 +1,5 @@
 use codec::{Decode, Encode};
-//use log::{error, info, trace, warn};
+use log::{debug,error, info, trace, warn};
 //use serde::{Deserialize, Serialize};
 use std::{
 	//collections::VecDeque,
@@ -320,7 +320,7 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 
 			let gossip_msg = GossipMessage::decode(&mut data);
 			if let Ok(gossip_msg) = gossip_msg {
-				println!("In `message_expired` of {:?}", inner.get_local_index());
+				debug!("In `message_expired` of {:?}", inner.get_local_index());
 				// println!("msg: {:?}", gossip_msg);
 				let gmsg = gossip_msg.clone();
 				match gmsg {

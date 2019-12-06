@@ -22,9 +22,11 @@ use parity_codec::{Decode, Encode};
 use parking_lot::Mutex;
 
 use badger_primitives::HBBFT_ENGINE_ID;
+use badger_primitives::BadgerPreRuntime;
 
 use badger_primitives::ConsensusLog;
-
+use badger::dynamic_honey_badger::Change;
+use badger::dynamic_honey_badger::ChangeState;
 
 use consensus_common::evaluation;
 use inherents::InherentIdentifier;
@@ -49,11 +51,11 @@ use client::backend::Backend;
 use client::blockchain::HeaderBackend;
 use client::error::Error as ClientError;
 use client::runtime_api::ConstructRuntimeApi;
-use client::CallExecutor;
-use client::Client;
 use client::{
 	backend::AuxStore, block_builder::api::BlockBuilder as BlockBuilderApi,
 	blockchain::ProvideCache, error,
+	blockchain, CallExecutor, Client, well_known_cache_keys
+
 };
 use communication::NetworkBridge;
 use communication::TransactionSet;
@@ -63,12 +65,16 @@ use consensus_common::import_queue::{
 	BasicQueue, BoxBlockImport, BoxFinalityProofImport, BoxJustificationImport, CacheKeyId,
 	Verifier,
 };
+use std::collections::HashMap;
+use consensus_common::ImportResult;
 pub use consensus_common::SyncOracle;
-use consensus_common::{self, BlockImportParams, BlockOrigin, ForkChoiceStrategy, SelectChain};
+use consensus_common::BlockCheckParams;
+use consensus_common::{self, BlockImportParams, BlockOrigin, ForkChoiceStrategy, SelectChain, Error as ConsensusError,};
 use inherents::{InherentData, InherentDataProviders};
 //use network::PeerId;
 use runtime_primitives::traits::DigestFor;
-use substrate_primitives::{Blake2Hasher, ExecutionContext, H256,storage::StorageKey};
+use runtime_primitives::generic::DigestItem;
+use substrate_primitives::{Blake2Hasher, ExecutionContext, H256,storage::StorageKey,};
 use substrate_telemetry::{telemetry, CONSENSUS_INFO, CONSENSUS_WARN};
 use transaction_pool::txpool::{self, Pool as TransactionPool};
 
@@ -123,6 +129,129 @@ where
 		Ok(())
 	}
 }
+
+
+pub struct BadgerBlockImport<B, E, Block: BlockT<Hash=H256>, RA, SC> {
+	pub inner: Arc<Client<B, E, Block, RA>>,
+	pub select_chain: SC,
+	pub authority_set: aux_store::BadgerSharedAuthoritySet,
+//	send_voter_commands: mpsc::UnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
+//	consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
+}
+
+impl<B, E, Block: BlockT<Hash=H256>, RA, SC: Clone> Clone for
+BadgerBlockImport<B, E, Block, RA, SC>
+{
+	fn clone(&self) -> Self {
+		BadgerBlockImport {
+			inner: self.inner.clone(),
+			select_chain: self.select_chain.clone(),
+			authority_set: self.authority_set.clone(),
+		}
+	}
+}
+
+
+
+impl<B, E, Block: BlockT<Hash=H256>, RA, SC>
+BadgerBlockImport<B, E, Block, RA, SC>
+{
+	pub(crate) fn new(
+		inner: Arc<Client<B, E, Block, RA>>,
+		select_chain: SC,
+		authority_set:  aux_store::BadgerSharedAuthoritySet,
+		//send_voter_commands: mpsc::UnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
+		//consensus_changes: SharedConsensusChanges<Block::Hash, NumberFor<Block>>,
+	) -> BadgerBlockImport<B, E, Block, RA, SC> {
+		BadgerBlockImport {
+			inner,
+			select_chain,
+			authority_set,
+			//send_voter_commands,
+			//consensus_changes,
+		}
+	}
+}
+
+
+
+impl<B, E, Block: BlockT<Hash=H256>, RA, SC> BlockImport<Block>
+	for BadgerBlockImport<B, E, Block, RA, SC> where
+		//NumberFor<Block>: grandpa::BlockNumberOps,
+		B: Backend<Block, Blake2Hasher> + 'static,
+		E: CallExecutor<Block, Blake2Hasher> + 'static + Clone + Send + Sync,
+		DigestFor<Block>: Encode,
+		RA: Send + Sync,
+{
+	type Error = ConsensusError;
+
+	fn import_block(
+		&mut self,
+		mut block: BlockImportParams<Block>,
+		new_cache: HashMap<well_known_cache_keys::Id, Vec<u8>>,
+	) -> Result<ImportResult, Self::Error> {
+		let hash = block.post_header().hash();
+		let number = block.header.number().clone();
+
+		// early exit if block already in chain, probably a duplicate sent from another node
+		match self.inner.status(BlockId::Hash(hash)) {
+			Ok(blockchain::BlockStatus::InChain) => 
+			{
+			info!("Block already in chain");
+			return Ok(ImportResult::AlreadyInChain)
+		    },
+			Ok(blockchain::BlockStatus::Unknown) => {},
+			Err(e) => return Err(ConsensusError::ClientImport(e.to_string()).into()),
+		}
+
+		//we only import our own blocks, though catch up may be necessary later on
+		match block.origin
+		{
+ 	    // Genesis block built into the client.
+		BlockOrigin::Genesis => {
+			info!("Importing Genesis"); },
+	    // Block is part of the initial sync with the network.
+	    BlockOrigin::NetworkInitialSync => {
+			  //ignore?
+			  return Ok(ImportResult::AlreadyInChain);
+	          },
+	// Block was broadcasted on the network.
+	BlockOrigin::NetworkBroadcast => {
+		//ignore?
+		return Ok(ImportResult::AlreadyInChain);
+		},
+	// Block that was received from the network and validated in the consensus process.
+	BlockOrigin::ConsensusBroadcast =>
+	{
+		return Ok(ImportResult::AlreadyInChain);
+	},
+	// Block that was collated by this node.
+	BlockOrigin::Own => {},
+	// Block was imported from a file.
+	BlockOrigin::File => {
+		//ignore?
+		return Ok(ImportResult::AlreadyInChain);
+		},
+		}
+
+		
+		// we  want to finalize on `inner.import_block`, probably
+		//let mut justification = block.justification.take();
+		//let enacts_consensus_change = !new_cache.is_empty();
+		let import_result = (&*self.inner).import_block(block, new_cache);
+		import_result
+	}
+
+	fn check_block(
+		&mut self,
+		block: BlockCheckParams<Block>,
+	) -> Result<ImportResult, Self::Error> {
+		self.inner.check_block(block)
+	}
+}
+
+
+
 
 impl<B: BlockT, C, Pub, Sig> Verifier<B> for BadgerVerifier<C, Pub, Sig>
 where
@@ -248,10 +377,6 @@ impl<B, E, Block: BlockT<Hash=H256>, RA> AuthoritySetGetter<Block> for Client<B,
 pub struct Config {
 	/// Some local identifier of the node.
 	pub name: Option<String>,
-//pub num_validators: usize,
-//	pub secret_key_share: Option<Arc<SecretKeyShare>>,
-//	pub node_id: Arc<AuthorityPair>,
-//	pub public_key_set: Arc<PublicKeySet>,
 	pub batch_size: u32,
 //	pub initial_validators: BTreeMap<PeerIdW, PublicKey>, replaced by session aspects
 //	pub node_indices: BTreeMap<PeerIdW, usize>, unnecessary
@@ -272,89 +397,7 @@ impl Config {
 			.map(|s| s.as_str())
 			.unwrap_or("<unknown>")
 	}
-	/* pub fn from_json_file_with_name(path: PathBuf, name: &str) -> Result<Self, String> {
-		let file = File::open(&path).map_err(|e| format!("Error opening config file: {}", e))?;
-		let spec: serde_json::Value =
-			json::from_reader(file).map_err(|e| format!("Error parsing spec file: {}", e))?;
-		let nodedata = match &spec["nodes"] {
-			Object(map) => match map.get(name) {
-				Some(dat) => dat,
-				None => return Err("Could not find node name".to_string()),
-			},
-			_ => return Err("Nodes object should be present".to_string()),
-		};
-
-		let ret = Config {
-			name: Some(name.to_string()),
-
-			secret_key_share: match &nodedata["secret_key_share"] {
-				Value::String(st) => Some(Arc::new(match secret_share_from_string(&st) {
-					Ok(val) => val,
-					Err(_) => return Err("secret_key_share".to_string()),
-				})),
-				_ => None,
-			},
-			node_id: match &nodedata["node_id"] {
-				Object(nid) => {
-					let pub_key: PublicKey = match &nid["pub"] {
-						Value::String(st) => {
-							let data = match hex::decode(st) {
-								Ok(val) => val,
-								Err(_) => return Err("Hex error in pub".to_string()),
-							};
-							match bincode::deserialize(&data) {
-								Ok(val) => val,
-								Err(_) => return Err("public key binary invalid".to_string()),
-							}
-						}
-						_ => return Err("pub key not string".to_string()),
-					};
-					let sec_key: SecretKey = match &nid["priv"] {
-						Value::String(st) => {
-							let data = match hex::decode(st) {
-								Ok(val) => val,
-								Err(_) => return Err("Hex error in priv".to_string()),
-							};
-							match bincode::deserialize(&data) {
-								Ok(val) => val,
-								Err(_) => return Err("secret key binary invalid".to_string()),
-							}
-						}
-						_ => return Err("priv key not string".to_string()),
-					};
-					Arc::new(HBPair{public:pub_key,secret:sec_key}.into()) 
-				}
-				_ => return Err("node id not pub/priv object".to_string()),
-			},
-			public_key_set: match &spec["public_key_set"] {
-				Value::String(st) => {
-					let data = match hex::decode(st) {
-						Ok(val) => val,
-						Err(_) => return Err("Hex error in public_key_set".to_string()),
-					};
-					match bincode::deserialize(&data) {
-						Ok(val) => Arc::new( val ),
-						Err(_) => return Err("public key set binary invalid".to_string()),
-					}
-				}
-				_ => return Err("pub key set not string".to_string()),
-			},
-			batch_size: match &spec["batch_size"] {
-				Number(x) => match x.as_u64() {
-					Some(y) => y as u32,
-					None => return Err("Invalid batch_size".to_string()),
-				},
-				Value::String(st) => match st.parse::<u32>() {
-					Ok(val) => val,
-					Err(_) => return Err("batch_size parsing error".to_string()),
-				},
-				_ => return Err("Invalid batch_size".to_string()),
-			},
-
 	
-		};
-		Ok(ret)
-	}*/
 }
 
 /// Errors that can occur while voting in BADGER.
@@ -428,6 +471,7 @@ where
 			.map_err(|e| Error::Blockchain(format!("{:?}", e)))
 	}
 }
+use communication::BadgerHandler;
 
 fn global_communication<Block: BlockT<Hash = H256>, B, E, N, RA>(
 	_client: &Arc<Client<B, E, Block, RA>>,
@@ -435,6 +479,7 @@ fn global_communication<Block: BlockT<Hash = H256>, B, E, N, RA>(
 ) -> (
 	impl Stream<Item = <QHB as ConsensusProtocol>::Output>,
 	impl SendOut,
+	impl BadgerHandler
 )
 where
 	B: Backend<Block, Blake2Hasher>,
@@ -446,7 +491,7 @@ where
 	let is_voter = network.is_validator();
 
 	// verification stream
-	let (global_in, global_out) = network.global_communication(
+	let (global_in, global_out,handler) = network.global_communication(
 		//	voters.clone(),
 		is_voter,
 	);
@@ -458,7 +503,7 @@ where
 			global_in,
 	);*/ //later
 
-	(global_in, global_out)
+	(global_in, global_out,handler)
 }
 
 /// Parameters used to run Honeyed Badger.
@@ -549,6 +594,42 @@ where
 use crate::aux_store::GenesisAuthoritySetProvider;
 
 
+pub fn block_importer<B, E, Block: BlockT<Hash=H256>, RA, SC>(
+	client: Arc<Client<B, E, Block, RA>>,
+	genesis_authorities_provider: &dyn GenesisAuthoritySetProvider<Block>,
+	select_chain: SC,
+) -> Result<BadgerBlockImport<B, E, Block, RA, SC>, ClientError>
+where
+	B: Backend<Block, Blake2Hasher> + 'static,
+	E: CallExecutor<Block, Blake2Hasher> + 'static + Clone + Send + Sync,
+	RA: Send + Sync,
+	SC: SelectChain<Block>,
+{
+	let chain_info = client.info();
+	let genesis_hash = chain_info.chain.genesis_hash;
+
+	let persistent_data = aux_store::loads_auth_set(
+		&*client,
+		|| {
+			let authorities = genesis_authorities_provider.get()?;
+			telemetry!(CONSENSUS_INFO; "afg.loading_authorities";
+				"authorities_len" => ?authorities.len()
+			);
+			Ok(authorities)
+		}
+	)?;
+
+	
+	Ok(		BadgerBlockImport::new(
+			client.clone(),
+			select_chain.clone(),
+			persistent_data.clone(),
+		),
+		
+	)
+}
+
+
 /// Run a HBBFT churn as a task. Provide configuration and a link to a
 /// block import worker that has already been instantiated with `block_import`.
 pub fn run_honey_badger<B, E, Block: BlockT<Hash = H256>, N, RA, SC, X, I, A>(
@@ -593,12 +674,14 @@ where
 		},keystore.clone()
 	)?;
 	info!("Badger AUTH {:?}",&persistent_data.authority_set.inner);
+
+	let auth_ref:Arc<parking_lot::RwLock<aux_store::AuthoritySet>>=persistent_data.authority_set.inner.clone();
 	let (network_bridge, network_startup) = NetworkBridge::new(network, config.clone(),keystore.clone(),persistent_data);
 
 	//let PersistentData { authority_set, set_state, consensus_changes } = persistent_data;
 
 	//	register_finality_tracker_inherent_data_provider(client.clone(), &inherent_data_providers)?;
-	let (blk_out, tx_in) = global_communication(&client, network_bridge);
+	let (blk_out, tx_in,handler ) = global_communication(&client, network_bridge);
 	let txcopy = Arc::new(parking_lot::RwLock::new(tx_in));
 	let tx_in_arc = txcopy.clone();
 
@@ -623,12 +706,36 @@ where
 	let ping_sel = selch.clone();
 	let receiver = blk_out.for_each(move |batch| {
 		info!("[[[[[[[");
-		let inherent_digests = generic::Digest { logs: vec![] };
+		let mut inherent_digests = generic::Digest { logs: vec![] };
+		//
 		info!(
 			"Processing batch with epoch {:?} of {:?} transactions into blocks",
 			batch.epoch(),
-			batch.len()
+			batch.len(),			
 		);
+		match batch.change()
+		{
+			ChangeState::None => {},
+			ChangeState::InProgress(Change::NodeChange(pubkeymap)) => 
+			{
+			 //change in progress, broadcast messages have to be sent to new node as well
+			 info!("CHANGE: in progress");
+			 handler.notify_node_set(pubkeymap.iter().map(|(v,_)| v.clone().into() ).collect() )
+			},
+			ChangeState::InProgress(Change::EncryptionSchedule(_)) => {},//don't care?
+			ChangeState::Complete(Change::NodeChange(pubkeymap)) => {
+				info!("CHANGE: complete {:?}",&pubkeymap);
+				let digest=BadgerPreRuntime::ValidatorsChanged(pubkeymap.iter().map(|(_,v)| v.clone().into() ).collect());
+				let logs=vec![DigestItem::PreRuntime(HBBFT_ENGINE_ID, digest.encode())];
+				inherent_digests.logs=logs;
+				//update internals before block is created?
+				handler.update_validators(pubkeymap.iter().
+			    map(| (c,v)| (c.clone().into(),v.clone().into()) ).collect() ,&*cclient);
+			},
+			ChangeState::Complete(Change::EncryptionSchedule(_)) => {},//don't care?
+			
+		
+		}
 		let chain_head = match selch.best_chain() {
 			Ok(x) => x,
 			Err(e) => {
@@ -826,13 +933,37 @@ where
 				// the right kind of consensus log.
 				let badger_logs:Vec<_>=header.digest().logs().iter().map(
 					|x| x.try_to(id)).filter( |x:&Option<ConsensusLog>| x.is_some()).map(|x| x.unwrap()).collect();
+				let  sid;	
+				{
+					sid=auth_ref.read().self_id.clone();
+				}
 				for log in badger_logs
 				{
+					
 					//TODO!
-					/*match log
+					match log
 					{
-						ConsensusLog
-					}*/
+						ConsensusLog::VoteChangeSet(my_id,changeset) =>
+						{
+						if sid==my_id
+						 {
+						   info!("Log detected, VOTING {:?}",&changeset);
+						   match handler.vote_for_validators(changeset,&*cclient)
+						   {
+							   Ok(_) =>{},
+							   Err(e) =>{
+								   info!("VoteErr: {:?}",e);
+							   }
+						   }
+                           info!("VOTEDED");
+						 }
+						},
+						ConsensusLog::NotifyChangedSet(newset) =>
+						{
+							info!("Notified of new set {:?}",&newset);
+						}
+
+					}
 				}
 
 				// sign the pre-sealed hash of the block and then
@@ -903,6 +1034,7 @@ where
 	let ping_client = client.clone();
 	// Delay::new(Duration::from_secs(1)).then(|_| {
 	let ping = Interval::new(Duration::from_millis(11500)).for_each(move |_| {
+
 		//put inherents here for now
 		let chain_head = match ping_sel.best_chain() {
 			Ok(x) => x,

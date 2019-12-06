@@ -20,6 +20,16 @@ pub mod app {
 		 s.into()
 		}
 	}
+	#[cfg(feature = "std")]
+	impl From<threshold_crypto::PublicKey> for Public
+	{
+		fn from(x:threshold_crypto::PublicKey) -> Public
+		{
+		 let s=std::convert::Into::<hbbft_thresh::Public>::into(x);
+		 s.into()
+		}
+	}
+
 }
 
 use rstd::vec::Vec;
@@ -56,23 +66,33 @@ use client::decl_runtime_apis;
 #[cfg_attr(feature = "std", derive(Serialize))]
 #[derive(Decode, Encode, PartialEq, Eq, Clone, RuntimeDebug)]
 pub enum ConsensusLog {
-	/// Schedule an authority set add by voting... If others also vote
-	#[codec(index = "1")]
-	VoteToAdd(AuthorityId),
-	/// Schedule an authority set removal by voting... If others also vote
-	#[codec(index = "2")]
-	VoteToRemove(AuthorityId),
+	// Schedule an authority set add by voting... If others also vote
+//	#[codec(index = "1")]
+//	VoteToAdd(AuthorityId),
+	// Schedule an authority set removal by voting... If others also vote
+//	#[codec(index = "2")]
+//	VoteToRemove(AuthorityId),
     ///completed voting ... m+ay not need these if we use session?
 	#[codec(index = "3")]
-  VoteComplete(Vec<AuthorityId>),
+	VoteChangeSet(AuthorityId,Vec<AuthorityId>),
+	
+
   #[codec(index = "4")]
   NotifyChangedSet(Vec<AuthorityId>),
   
 }
 
+#[cfg_attr(feature = "std", derive(Serialize))]
+#[derive(Decode, Encode, PartialEq, Eq, Clone, RuntimeDebug)]
+pub enum BadgerPreRuntime
+{
+	#[codec(index = "1")]
+    ValidatorsChanged(Vec<AuthorityId>)
+}
+
 impl ConsensusLog {
 	/// Try to cast the log entry as a contained signal.
-	pub fn try_into_add(self) -> Option<AuthorityId> {
+	/*pub fn try_into_add(self) -> Option<AuthorityId> {
 		match self {
 			ConsensusLog::VoteToAdd(id) => Some(id),
 			_ => None,
@@ -85,12 +105,12 @@ impl ConsensusLog {
 			ConsensusLog::VoteToRemove(id) => Some(id),
 			_ => None,
 		}
-	}
+	}*/
 
 	/// Try to cast the log entry as a contained pause signal.
-	pub fn try_into_complete(self) -> Option<Vec<AuthorityId>> {
+	pub fn try_into_changeset(self) -> Option<(AuthorityId, Vec<AuthorityId>)> {
 		match self {
-			ConsensusLog::VoteComplete(authids) => Some(authids),
+			ConsensusLog::VoteChangeSet(sel,authids) => Some( (sel,authids) ),
 			_ => None,
 		}
 	}

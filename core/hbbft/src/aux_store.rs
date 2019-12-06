@@ -64,6 +64,15 @@ pub(crate) fn load_decode<B: AuxStore, T: Decode>(backend: &B, key: &[u8]) -> Cl
 pub  struct BadgerSharedAuthoritySet {
 	pub inner: Arc<RwLock<AuthoritySet>>,
 }
+
+impl Clone for BadgerSharedAuthoritySet
+{
+	fn clone(&self) -> Self {
+		BadgerSharedAuthoritySet {
+			inner: self.inner.clone(),
+		}
+	}
+}
 impl From<AuthoritySet> for BadgerSharedAuthoritySet {
 	fn from(set: AuthoritySet) -> Self {
 		BadgerSharedAuthoritySet { inner: Arc::new(RwLock::new(set)) }
@@ -74,6 +83,40 @@ pub struct BadgerPersistentData
  {
     pub authority_set: BadgerSharedAuthoritySet,
     pub change_vote: Option<BadgerSharedAuthoritySet>,
+}
+
+pub fn loads_auth_set< B, G>(backend: &B,
+	genesis_authorities: G,)->ClientResult<BadgerSharedAuthoritySet>
+	where
+	B: AuxStore,
+	G: FnOnce() -> ClientResult<AuthorityList>,
+
+{
+	let version: Option<u32> = load_decode(backend, VERSION_KEY)?;
+	match version {
+		None |  Some(CURRENT_VERSION) => {
+
+            if let Some(set) = load_decode::<_, AuthoritySet>(
+				backend,
+				AUTHORITY_SET_KEY,
+            )?
+            {
+
+                return Ok( set.into(),
+					);
+            }
+            
+		},
+		
+		Some(other) => return Err(ClientError::Backend(
+			format!("Unsupported BADGER DB version: {:?}", other)
+		).into()),
+	};
+	info!(target: "afg", "Loading Badger authority set, no init.");
+
+	let genesis_authorities = genesis_authorities()?;
+	let genesis_set=AuthoritySet{current_authorities:genesis_authorities, set_id:0,self_id:Default::default()};
+	return Ok(genesis_set.into());
 }
 
 /// Load or initialize persistent data from backend.

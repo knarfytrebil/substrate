@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use network::PeerId;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, From, Into)]
+#[repr(transparent)]
 pub struct PeerIdW(pub PeerId);
 
 impl PartialOrd for PeerIdW

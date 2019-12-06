@@ -91,7 +91,7 @@ macro_rules! new_full_start {
 		type RpcExtension = jsonrpc_core::IoHandler<substrate_rpc::Metadata>;
 		//let mut import_setup = None;
 		let inherent_data_providers = inherents::InherentDataProviders::new();
-
+		let mut import_setup = None;
 		let builder = substrate_service::ServiceBuilder::new_full::<
 			hb_node_primitives::Block, hb_node_runtime::RuntimeApi, hb_node_executor::Executor
 		>($config)?
@@ -101,11 +101,12 @@ macro_rules! new_full_start {
 			.with_transaction_pool(|config, client|
 				Ok(transaction_pool::txpool::Pool::new(config, transaction_pool::FullChainApi::new(client)))
 			)?
-			.with_import_queue(|_config, client, mut _select_chain, _transaction_pool| {
+			.with_import_queue(|_config, client,  select_chain, _transaction_pool| {
         #[allow(deprecated)]
         // let fprb = Box::new(DummyFinalityProofRequestBuilder::default()) as Box<_>;
-        let block_import = client.clone();
-        //let justification_import = block_import.clone();
+		let block_import = badger::block_importer(client.clone(), &*client.clone(), select_chain.unwrap(),).expect("Invalid setup. QWOP.");
+		//let justification_import = block_import.clone();
+		import_setup=Some(block_import.clone());
         badger_import_queue::<_, _, Public, Signature>(
           Box::new(block_import),
           None,
@@ -120,7 +121,7 @@ macro_rules! new_full_start {
 				hb_node_rpc::create(client, pool,ks)
 			})?;
 
-		(builder,  inherent_data_providers)
+		(builder,  import_setup,inherent_data_providers)
 	}}
 }
 
@@ -152,7 +153,7 @@ macro_rules! new_full {
 		// never actively participate in any consensus process.
 		let participates_in_consensus = is_authority && !$config.sentry_mode;
 
-		let (builder,  inherent_data_providers) = new_full_start!($config);
+		let (builder, import_setup, inherent_data_providers) = new_full_start!($config);
     let back = builder.backend().clone();
 		
 		// Dht event channel from the network to the authority discovery module. Use bounded channel to ensure
@@ -186,6 +187,7 @@ macro_rules! new_full {
 		  name: Some(node_name.to_string()),
           batch_size:20,  
 	  };
+	  let b_i=import_setup.expect("Should be initialized by now");
       let badger = run_honey_badger(
         client,
 		t_pool,
@@ -196,7 +198,7 @@ macro_rules! new_full {
           info!("OnExit");
           ()
         }),
-        Arc::new(Mutex::new(service.client().clone())), //block_import?
+        Arc::new(Mutex::new(b_i)), //block_import?
         //service.config().custom.inherent_data_providers.clone(),
         inherent_data_providers.clone(),
         select_chain,
@@ -206,7 +208,7 @@ macro_rules! new_full {
       )?;    
       let key_gen = keygen::run_key_gen(
         service.network().local_peer_id(),
-        (2, 4),
+        (2, 5),
         3,
         service.keystore(),
         service.client(),
