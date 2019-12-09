@@ -269,14 +269,13 @@ impl Peers
           if *authority != auth_id
           {
             self.inverse.remove(&authority);
-            
           }
         }
         if !self.inverse.contains_key(&auth_id)
         {
           self.inverse.insert(auth_id.clone(), who.clone());
-        }   
-      
+        }
+
         p.id = Some(auth_id);
       }
     };

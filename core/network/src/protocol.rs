@@ -17,6 +17,7 @@
 use crate::{DiscoveryNetBehaviour, config::ProtocolId};
 use crate::legacy_proto::{LegacyProto, LegacyProtoOut};
 use bytes::BytesMut;
+use log::info;
 use futures::prelude::*;
 use futures03::{StreamExt as _, TryStreamExt as _};
 use libp2p::{Multiaddr, PeerId};
@@ -825,6 +826,7 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 
 	/// Adjusts the reputation of a node.
 	pub fn report_peer(&self, who: PeerId, reputation: i32) {
+		//info!("Reporting peer {:?} for {:?}",&who,&reputation);
 		self.peerset_handle.report_peer(who, reputation)
 	}
 
