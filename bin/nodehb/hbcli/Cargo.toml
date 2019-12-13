@@ -1,0 +1,128 @@
+[package]
+name = "hbnode-cli"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+description = "Substrate node implementation in Rust."
+build = "build.rs"
+edition = "2018"
+default-run = "substrate-hb"
+
+[[bin]]
+name = "substrate-hb"
+path = "bin/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+# third-party dependencies
+codec = { package = "parity-scale-codec", version = "1.0.6" }
+futures = "0.1.29"
+hex-literal = "0.2.1"
+jsonrpc-core = "14.0.3"
+log = "0.4.8"
+rand = "0.7.2"
+serde = { version = "1.0.102", features = [ "derive" ] }
+structopt = "0.3.3"
+futures03 = { package = "futures", version = "=0.3.1", features = ["compat"] }
+
+# primitives dependencies
+primitives = { package = "sp-core", path = "../../../primitives/core" }
+sp-runtime = { path = "../../../primitives/runtime" }
+badger_primitives = { package = "substrate-badger-primitives", path = "../../../primitives/hbbft" }
+txpool-api = { package = "sp-transaction-pool", path = "../../../primitives/transaction-pool" }
+# core dependencies
+sr-io = { package = "sp-io", path = "../../../primitives/io" }
+client = { package = "sc-client", path = "../../../client" }
+inherents = { package = "sp-inherents", path = "../../../primitives/inherents" }
+transaction_pool = { package = "sc-transaction-pool", path = "../../../client/transaction-pool" }
+network = { package = "sc-network", path = "../../../client/network" }
+keyring = { package = "sp-keyring", path = "../../../primitives/keyring" }
+badger = { package = "substrate-badger-mushroom", path = "../../../client/hbbft" }
+substrate-rpc = { package = "sc-rpc", path = "../../../client/rpc" }
+substrate-basic-authorship = {package="sc-basic-authority", path = "../../../client/basic-authorship" }
+sc-service = { path = "../../../client/service" }
+substrate-telemetry = { package = "sc-telemetry", path = "../../../client/telemetry" }
+keygen = { package="substrate-keygen", path = "../../../client/keygen" }
+client-api = { package = "sc-client-api", path = "../../../client/api" }
+
+
+
+# srml dependencies
+indices = { package = "pallet-indices", path = "../../../frame/indices/" }
+timestamp = { package = "pallet-timestamp", path = "../../../frame/timestamp" }
+finality_tracker = { package = "pallet-finality-tracker", path = "../../../frame/finality-tracker"}
+finality_tracker_prim = { package = "sp-finality-tracker", path = "../../../primitives/finality-tracker"}
+
+system = { package = "frame-system", path = "../../../frame/system" }
+balances = { package = "pallet-balances", path = "../../../frame/balances" }
+transaction-payment = { package = "pallet-transaction-payment", path = "../../../frame/transaction-payment" }
+offchain = { package = "sc-offchain", path = "../../../client/offchain" }
+chain-spec = { package = "sc-chain-spec", path = "../../../client/chain-spec" }
+contracts = { package = "pallet-contracts", path = "../../../frame/contracts" }
+
+# node-specific dependencies
+hb-node-runtime = { path = "../runtime" }
+hb-node-rpc = { path = "../rpc" }
+hb-node-primitives = { path = "../primitives" }
+hb-node-executor = { path = "../executor" }
+parking_lot = "0.9.0"
+client_db = { package = "sc-client-db", path = "../../../client/db", default-features = false }
+
+# CLI-specific dependencies
+tokio = { version = "0.1.22", optional = true }
+exit-future = { version = "0.1.4", optional = true }
+sc-cli = { path = "../../../client/cli", optional = true }
+transaction-factory = {package = "hb-node-transaction-factory",  path = "../transaction-factory", optional = true }
+ctrlc = { version = "3.1.3", features = ["termination"], optional = true }
+
+
+libp2p = { version = "0.13.0", default-features = false, optional = true }
+clear_on_drop = { version = "0.2.3", features = ["no_cc"], optional = true }	# Imported just for the `no_cc` feature
+console_error_panic_hook = { version = "0.1.1", optional = true }
+console_log = { version = "0.1.2", optional = true }
+js-sys = { version = "0.3.22", optional = true }
+wasm-bindgen = { version = "0.2.45", optional = true }
+wasm-bindgen-futures = { version = "0.3.22", optional = true }
+kvdb-memorydb = { version = "0.1.1", optional = true }
+rand6 = { package = "rand", version = "0.6", features = ["wasm-bindgen"], optional = true }	# Imported just for the `wasm-bindgen` feature
+
+
+
+[dev-dependencies]
+consensus-common = { package = "sp-consensus", path = "../../../primitives/consensus/common" }
+keystore = { package = "sc-keystore", path = "../../../client/keystore" }
+service-test = { package = "sc-service-test", path = "../../../client/service/test" }
+
+[build-dependencies]
+sc-cli = { package = "sc-cli", path = "../../../client/cli" }
+build-script-utils = { package = "substrate-build-script-utils", path = "../../../utils/build-script-utils" }
+structopt = "0.3.3"
+vergen = "3.0.4"
+
+[features]
+default = ["cli"]
+browser = [
+	"clear_on_drop",
+	"console_error_panic_hook",
+	"console_log",
+	"js-sys",
+	"libp2p",
+	"wasm-bindgen",
+	"wasm-bindgen-futures",
+	"kvdb-memorydb",
+	"rand/wasm-bindgen",
+	"rand6"
+]
+cli = [
+	"sc-cli",
+	"transaction-factory",
+	"tokio",
+	"ctrlc",
+	"sc-service/rocksdb",
+	"hb-node-executor/wasmi-errno",
+]
+wasmtime = [
+	"cli",
+	"hb-node-executor/wasmtime",
+	"sc-cli/wasmtime",
+	"sc-service/wasmtime",
+]

@@ -1,0 +1,108 @@
+[package]
+name = "hb-node-runtime"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+build = "build.rs"
+
+[dependencies]
+# third-party dependencies
+integer-sqrt = { version = "0.1.2" }
+safe-mix = { version = "1.0", default-features = false }
+codec = { package = "parity-scale-codec", version = "1.0.6", default-features = false, features = ["derive"] }
+rustc-hex = { version = "2.0", optional = true }
+serde = { version = "1.0", optional = true }
+
+inherents = { package = "sp-inherents", path = "../../../primitives/inherents", default-features = false}
+sp-api = { path = "../../../primitives/api", default-features = false }
+
+# primitives
+primitives = { package = "sp-core",  path = "../../../primitives/core", default-features = false }
+sp-runtime = { path = "../../../primitives/runtime", default-features = false }
+offchain-primitives = { package = "sp-offchain", path = "../../../primitives/offchain", default-features = false }
+badger-primitives = { package = "substrate-badger-primitives", path = "../../../primitives/hbbft", default-features = false}
+hb-node-primitives = { package = "hb-node-primitives",path = "../primitives", default-features = false }
+block-builder-api = { package = "sp-block-builder", path = "../../../primitives/block-builder", default-features = false}
+
+sp-transaction-pool = { package = "sp-transaction-pool", path = "../../../primitives/transaction-pool", default-features = false }
+
+
+# core dependencies
+rstd = { package = "sp-std", path = "../../../primitives/std", default-features = false }
+version = { package = "sp-version", path = "../../../primitives/version", default-features = false }
+sp-keyring = { path = "../../../primitives/keyring", optional = true,default-features = false }
+sp-session = { path = "../../../primitives/session", default-features = false }
+runtime-io = { package = "sp-io", path = "../../../primitives/io", default-features = false }
+
+# srml dependencies
+support = { package = "frame-support", path = "../../../frame/support", default-features = false }
+authorship = { package = "pallet-authorship", path = "../../../frame/authorship", default-features = false }
+contracts = { package = "pallet-contracts", path = "../../../frame/contracts", default-features = false }
+contracts-rpc-runtime-api = { package = "pallet-contracts-rpc-runtime-api", path = "../../../frame/contracts/rpc/runtime-api/", default-features = false }
+balances = { package = "pallet-balances", path = "../../../frame/balances", default-features = false }
+elections = { package = "pallet-elections", path = "../../../frame/elections", default-features = false }
+executive = { package = "frame-executive", path = "../../../frame/executive", default-features = false }
+finality-tracker = { package = "pallet-finality-tracker", path = "../../../frame/finality-tracker", default-features = false }
+indices = { package = "pallet-indices", path = "../../../frame/indices", default-features = false }
+membership = { package = "pallet-membership", path = "../../../frame/membership", default-features = false }
+session = { package = "pallet-session", path = "../../../frame/session", default-features = false, features = ["historical"] }
+system = { package = "frame-system", path = "../../../frame/system", default-features = false }
+system-rpc-runtime-api = { package = "frame-system-rpc-runtime-api", path = "../../../frame/system/rpc/runtime-api/", default-features = false }
+timestamp = { package = "pallet-timestamp", path = "../../../frame/timestamp", default-features = false }
+treasury = { package = "pallet-treasury", path = "../../../frame/treasury", default-features = false }
+sudo = { package = "pallet-sudo", path = "../../../frame/sudo", default-features = false }
+randomness-collective-flip = { package = "pallet-randomness-collective-flip", path = "../../../frame/randomness-collective-flip", default_features = false }
+transaction-payment = { package = "pallet-transaction-payment", path = "../../../frame/transaction-payment", default-features = false }
+substrate-mpecdsa-primitives={ path = "../../../primitives/keygen", default-features = false }
+pallet-badger = { package = "pallet-badger", path = "../../../frame/hbbft", default-features = false }
+pallet-keygen = { package = "pallet-keygen", path = "../../../frame/keygen", default-features = false }
+
+[build-dependencies]
+wasm-builder-runner = { package = "substrate-wasm-builder-runner", path = "../../../utils/wasm-builder-runner", version = "1.0.4" }
+
+[dev-dependencies]
+runtime-io = { package = "sp-io", path = "../../../primitives/io" }
+
+[features]
+default = ["std"]
+std = [
+	"sp-transaction-pool/std",
+	"inherents/std",
+	"sp-api/std",
+	"runtime-io/std",
+	"codec/std",
+	"block-builder-api/std",
+	"primitives/std",
+	"rstd/std",
+	"sp-runtime/std",
+	"support/std",
+	"authorship/std",
+	"balances/std",
+	"contracts/std",
+	"elections/std",
+	"executive/std",
+	"finality-tracker/std",
+	"indices/std",
+	"membership/std",
+	"system/std",
+	"timestamp/std",
+	"treasury/std",
+	"sudo/std",
+	"version/std",
+	"badger-primitives/std",
+	"hb-node-primitives/std",
+	"serde",
+	"safe-mix/std",
+	"rustc-hex",
+	"sp-keyring",
+	"offchain-primitives/std",
+	"sp-session/std",
+	"session/std",
+	"pallet-badger/std",
+	"pallet-keygen/std",
+	"randomness-collective-flip/std",
+	"transaction-payment/std",
+	"system-rpc-runtime-api/std",
+	"contracts-rpc-runtime-api/std",
+	"substrate-mpecdsa-primitives/std"
+]

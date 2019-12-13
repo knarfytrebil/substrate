@@ -1,0 +1,22 @@
+[package]
+name = "hb-node-rpc"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+
+
+[dependencies]
+client = { package = "sc-client", path = "../../../client" }
+jsonrpc-core = "14.0.3"
+hb-node-primitives = { path = "../primitives" }
+hb-node-runtime = { path = "../runtime" }
+sp-runtime = { path = "../../../primitives/runtime" }
+srml-contracts-rpc = { package="pallet-contracts-rpc",path = "../../../frame/contracts/rpc/" }
+srml-transaction-payment-rpc = { package="pallet-transaction-payment-rpc", path = "../../../frame/transaction-payment/rpc/" }
+srml-system-rpc = { package = "frame-system-rpc-runtime-api", path = "../../../frame/system/rpc/runtime-api/", default-features = false }
+transaction_pool = { package = "sc-transaction-pool", path = "../../../client/transaction-pool" }
+badger = { package = "substrate-badger-mushroom", path = "../../../client/hbbft" }
+keystore = { package = "sc-keystore", path = "../../../client/keystore" }
+substrate-frame-rpc-system = { path = "../../../utils/frame/rpc/system" }
+sc-api={ package = "sc-client-api", path = "../../../client/api" }
+txpool-api = { package = "sp-transaction-pool", path = "../../../primitives/transaction-pool" }
