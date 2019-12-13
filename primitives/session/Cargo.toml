@@ -1,0 +1,14 @@
+[package]
+name = "sp-session"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+
+[dependencies]
+sp-api = { path = "../api", default-features = false }
+sp-std = { path = "../std", default-features = false }
+sp-runtime = { path = "../runtime", optional = true }
+
+[features]
+default = [ "std" ]
+std = [ "sp-api/std", "sp-std/std", "sp-runtime" ]

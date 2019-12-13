@@ -1,0 +1,23 @@
+[package]
+name = "sp-phragmen"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0.101", optional = true, features = ["derive"] }
+sp-std = { path = "../std", default-features = false }
+sp-runtime = { path = "../../primitives/runtime", default-features = false }
+
+[dev-dependencies]
+substrate-test-utils = { path = "../../test-utils" }
+sp-io ={ path = "../../primitives/io" }
+rand = "0.7.2"
+
+[features]
+default = ["std"]
+std = [
+	"serde",
+	"sp-std/std",
+	"sp-runtime/std",
+]
