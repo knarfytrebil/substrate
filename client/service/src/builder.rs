@@ -1178,24 +1178,23 @@ ServiceBuilder<
 			telemetry
 		});
 
-<<<<<<< HEAD:core/service/src/builder.rs
-    // lightning bridge
-    let ln_bridge = ln_bridge::LnBridge::new(exit.clone(), config.n_conf_file.clone()
-        .unwrap_or(String::from("./Settings.toml")));
-    let ln_bridge = Arc::new(ln_bridge);
-    let ln_tasks = ln_bridge.bind_client(client.clone());
-    
-    let node_key = match backend.offchain_storage() {
-        Some(key) => {
-            ln_bridge.storage_ltn_key(key);
-        },
-        None => {
-            panic!("Node key is none"); 
-        }
-    };
+                // lightning bridge
+                let ln_bridge = ln_bridge::LnBridge::new(exit.clone(), config.n_conf_file.clone()
+                    .unwrap_or(String::from("./Settings.toml")));
+                let ln_bridge = Arc::new(ln_bridge);
+                let ln_tasks = ln_bridge.bind_client(client.clone());
+                
+                let node_key = match backend.offchain_storage() {
+                    Some(key) => {
+                        ln_bridge.storage_ltn_key(key);
+                    },
+                    None => {
+                        panic!("Node key is none"); 
+                    }
+                };
 
-    to_spawn_tx.unbounded_send(ln_tasks);
-=======
+                to_spawn_tx.unbounded_send(ln_tasks);
+
 		// Grafana data source
 		if let Some(port) = config.grafana_port {
 			let future = select(
@@ -1207,7 +1206,7 @@ ServiceBuilder<
 			}).compat();
 
 			let _ = to_spawn_tx.unbounded_send(Box::new(future));
-    }
+                }
 
 		// Instrumentation
 		if let Some(tracing_targets) = config.tracing_targets.as_ref() {
@@ -1219,7 +1218,6 @@ ServiceBuilder<
 				Err(e) => error!(target: "tracing", "Unable to set global default subscriber {}", e),
 			}
 		}
->>>>>>> dba1041205bd0a2a766491baed077dbaba36e084:client/service/src/builder.rs
 
 		Ok(Service {
 			client,

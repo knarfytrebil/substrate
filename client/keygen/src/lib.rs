@@ -1,8 +1,5 @@
-<<<<<<< HEAD:core/keygen/src/lib.rs
 use client::backend::OffchainStorage;
-=======
 
->>>>>>> dba1041205bd0a2a766491baed077dbaba36e084:client/keygen/src/lib.rs
 use primitives::offchain::StorageKind;
 use std::{
   collections::{BTreeMap, }, //VecDeque
