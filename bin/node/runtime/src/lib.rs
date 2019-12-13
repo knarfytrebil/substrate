@@ -517,10 +517,10 @@ impl system::offchain::CreateTransaction<Runtime, UncheckedExtrinsic> for Runtim
 	}
 }
 
-impl lightning::Trait for Runtime {
-  type Call = Call;
-  type SubmitTransaction = SubmitTransaction;
-}
+// impl lightning::Trait for Runtime {
+//   type Call = Call;
+//   type SubmitTransaction = SubmitTransaction;
+// }
 
 construct_runtime!(
 	pub enum Runtime where
@@ -552,7 +552,7 @@ construct_runtime!(
 		AuthorityDiscovery: authority_discovery::{Module, Call, Config},
 		Offences: offences::{Module, Call, Storage, Event},
 		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
-                Lightning: lightning::{Module, Call, Storage, ValidateUnsigned},
+                // Lightning: lightning::{Module, Call, Storage, ValidateUnsigned},
 		Nicks: nicks::{Module, Call, Storage, Event<T>},
 	}
 );
@@ -734,10 +734,10 @@ impl_runtime_apis! {
 		}
 	}
 
-  impl ln_primitives::LnApi<Block> for Runtime {
-    fn link_bridge() {
-    }
-  }
+//  impl ln_primitives::LnApi<Block> for Runtime {
+//    fn link_bridge() {
+//    }
+//  }
 }
 
 #[cfg(test)]

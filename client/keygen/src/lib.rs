@@ -1,5 +1,3 @@
-use client::backend::OffchainStorage;
-
 use primitives::offchain::StorageKind;
 use std::{
   collections::{BTreeMap, }, //VecDeque

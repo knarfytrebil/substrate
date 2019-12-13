@@ -68,7 +68,7 @@ pub use network::{FinalityProofProvider, OnDemand, config::BoxFinalityProofReque
 #[doc(hidden)]
 pub use futures::future::Executor;
 
-pub use ln_bridge::{self, LnBridge};
+// pub use ln_bridge::{self, LnBridge};
 
 const DEFAULT_PROTOCOL_ID: &str = "sup";
 
@@ -107,7 +107,7 @@ pub struct Service<TBl, TCl, TSc, TNetStatus, TNet, TTxPool, TOc> {
 	_telemetry_on_connect_sinks: Arc<Mutex<Vec<mpsc::UnboundedSender<()>>>>,
 	_offchain_workers: Option<Arc<TOc>>,
 	keystore: keystore::KeyStorePtr,
-        ln_bridge: Arc<LnBridge>,
+        // ln_bridge: Arc<LnBridge>,
 	marker: PhantomData<TBl>,
 }
 
@@ -434,11 +434,11 @@ macro_rules! new_impl {
 		});
 
     // lightning bridge
-    let ln_bridge = ln_bridge::LnBridge::new(exit.clone());
-    let ln_bridge = Arc::new(ln_bridge);
-    let ln_tasks = ln_bridge.bind_client(client.clone());
-    ln_bridge.storage_ltn_key(backend.offchain_storage().unwrap());
-    to_spawn_tx.unbounded_send(ln_tasks);
+    // let ln_bridge = ln_bridge::LnBridge::new(exit.clone());
+    // let ln_bridge = Arc::new(ln_bridge);
+    // let ln_tasks = ln_bridge.bind_client(client.clone());
+    // ln_bridge.storage_ltn_key(backend.offchain_storage().unwrap());
+    // to_spawn_tx.unbounded_send(ln_tasks);
 
 		Ok(NewService {
 			client,
@@ -458,7 +458,7 @@ macro_rules! new_impl {
 			_offchain_workers: offchain_workers,
 			_telemetry_on_connect_sinks: telemetry_connection_sinks.clone(),
 			keystore, 
-                        ln_bridge,
+                        // kln_bridge,
 			marker: PhantomData::<$block>,
 		})
 	}}
@@ -530,7 +530,7 @@ pub trait AbstractService: 'static + Future<Item = (), Error = Error> +
 	/// Get shared transaction pool instance.
 	fn transaction_pool(&self) -> Arc<Self::TransactionPool>;
 
-  fn ln_bridge(&self) -> Arc<LnBridge>;
+        // fn ln_bridge(&self) -> Arc<LnBridge>;
 	/// Get a handle to a future that will resolve on exit.
 	fn on_exit(&self) -> ::exit_future::Exit;
 }
@@ -625,9 +625,9 @@ where
 		self.transaction_pool.clone()
 	}
 
-  fn ln_bridge(&self) -> Arc<LnBridge> {
-    self.ln_bridge.clone()
-  }
+        // fn ln_bridge(&self) -> Arc<LnBridge> {
+        //     self.ln_bridge.clone()
+        // }
 
 	fn on_exit(&self) -> exit_future::Exit {
 		self.exit.clone()

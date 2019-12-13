@@ -204,8 +204,8 @@ macro_rules! new_full {
 
 			service.spawn_task(future01_authority_discovery);
 		}
-    let ln_bridge = service.ln_bridge();
-    ln_bridge.bind_runtime(service.client());
+    // let ln_bridge = service.ln_bridge();
+    // ln_bridge.bind_runtime(service.client());
 
 		// if the node isn't actively participating in consensus then it doesn't
 		// need a keystore, regardless of which protocol we use below.
