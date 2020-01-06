@@ -1,4 +1,4 @@
-//use runtime_primitives::traits::Block as BlockT;
+use runtime_primitives::traits::Block as BlockT;
 //use network::consensus_gossip::{self as network_gossip, MessageIntent, ValidatorContext};
 use badger_primitives::{AuthorityId, AuthorityPair, AuthoritySignature};
 use network::PeerId; //config::Roles,
@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use substrate_primitives::crypto::Pair; //RuntimeAppPublic
                                         //use std::time::{ Instant};//Duration
 
+use runtime_primitives::traits::NumberFor;
 use app_crypto::RuntimeAppPublic;
 
 //const REBROADCAST_AFTER: Duration = Duration::from_secs(60 * 5);
@@ -27,19 +28,120 @@ use app_crypto::RuntimeAppPublic;
 //const KEEP_RECENT_ROUNDS: usize = 3;
 
 //const BADGER_TOPIC: &str = "itsasnake";
-use crate::communication::PeerIdW;
+use sc_peerid_wrapper::PeerIdW;
 /// HB gossip message type.
 /// This is the root type that gets encoded and sent on the network.
 #[derive(Debug, Encode, Decode)]
-pub enum GossipMessage
+pub enum GossipMessage<Block: BlockT>
 {
   /// Raw Badger data
   BadgerData(BadgeredMessage),
+  /// Initial keygen data
   KeygenData(BadgeredMessage),
+  /// Session notification for peer to badger pubkey mapping
   Session(SessionMessage),
+  /// Justification data emitted when the new block needs to be confirmed
+  JustificationData(BadgerJustification<Block>),
+
+  /// Full block justification data to facilitate initial sync 
+  SyncGossip(BadgerSyncGossip<Block>)
 }
 
-impl GossipMessage
+#[derive(Encode, Decode, Debug,Clone)]
+pub struct BadgerJustification<Block: BlockT> 
+{
+	pub hash: Block::Hash,
+  pub validator:AuthorityId,
+  pub sgn: AuthoritySignature,
+}
+
+
+
+
+#[derive(Encode, Decode, Debug,Clone)]
+pub struct BadgerAuthCommit 
+{
+  pub validator:AuthorityId,
+  pub sgn: AuthoritySignature,
+}
+
+
+#[derive(Encode, Decode, Debug,Clone)]
+pub struct BadgerFullJustification<Block: BlockT> 
+{
+	pub hash: Block::Hash,
+  pub commits:Vec<BadgerAuthCommit>,
+}
+
+
+#[derive(Encode, Decode, Debug,Clone)]
+pub struct BadgerSyncData<Block: BlockT> 
+{
+ pub  num:NumberFor::<Block>,
+  pub justification:BadgerFullJustification<Block>
+}
+
+#[derive(Encode, Decode, Debug,Clone)]
+pub struct BadgerSyncGossip<Block: BlockT> 
+{
+ pub data:BadgerSyncData<Block>,
+ pub source:AuthorityId,
+ pub sgn:AuthoritySignature
+}
+
+impl<Block: BlockT> BadgerSyncGossip<Block>
+{
+  pub fn verify(&self) -> bool
+  {
+    if ! self.data.justification.verify() {return false};
+    badger_primitives::app::Public::verify(&self.source, &self.data.encode(), &self.sgn)
+
+  }
+  pub fn new(originator: &AuthorityPair, just:BadgerFullJustification<Block>,num: NumberFor::<Block> ) -> BadgerSyncGossip<Block>
+  {
+    let bsd=BadgerSyncData
+    {
+      num:num,
+      justification:just,
+    };
+    let sig=originator.sign(&bsd.encode());
+    BadgerSyncGossip {
+      data: bsd,
+      source: originator.public(),
+      sgn: sig,
+    }
+  }
+}
+
+
+
+impl<Block: BlockT> BadgerFullJustification<Block>
+{
+  pub fn verify(&self) -> bool
+  {
+    let enc=self.hash.encode();
+    for commit in self.commits.iter(){
+     if ! badger_primitives::app::Public::verify(&commit.validator, &enc, &commit.sgn)
+     {
+       return false;
+     }
+    }
+    return true;
+   
+  }
+}
+
+
+
+impl<Block: BlockT> BadgerJustification<Block>
+{
+  pub fn verify(&self) -> bool
+  {
+    badger_primitives::app::Public::verify(&self.validator, &self.hash.encode(), &self.sgn)
+  }
+}
+
+impl<B:BlockT> GossipMessage<B>
 {
   pub fn verify(&self) -> bool
   {
@@ -48,6 +150,8 @@ impl GossipMessage
       GossipMessage::BadgerData(data) => data.verify(),
       GossipMessage::KeygenData(data) => data.verify(),
       GossipMessage::Session(data) => data.verify(),
+      GossipMessage::JustificationData(data) =>data.verify(),
+      GossipMessage::SyncGossip(data) =>data.verify(),
     }
   }
 }
@@ -307,6 +411,7 @@ pub enum Action<H>
   Useless(H),
 }
 
+/*
 #[derive(Debug, PartialEq, Clone)]
 pub enum SAction
 {
@@ -322,3 +427,4 @@ pub enum SAction
   //Queue locally and retry later, contains relevance/topic?
   QueueRetry(u64),
 }
+*/

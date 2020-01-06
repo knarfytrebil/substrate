@@ -1,0 +1,35 @@
+[package]
+name = "pallet-mpc"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0.103", optional = true }
+codec = { package = "parity-scale-codec", version = "1.1.0", default-features = false, features = ["derive"] }
+
+app-crypto = { package = "sp-application-crypto", path = "../../primitives/application-crypto", default-features = false }
+sp-std = { path = "../../primitives/std", default-features = false }
+sp-io = { path = "../../primitives/io", default-features = false }
+sp-runtime = { path = "../../primitives/runtime", default-features = false }
+sp-core = { path = "../../primitives/core", default-features = false }
+sp-mpc = { path = "../../primitives/mpc", default-features = false }
+
+system = { package = "frame-system", path = "../system", default-features = false }
+support = { package = "frame-support", path = "../support", default-features = false }
+
+
+[dev-dependencies]
+timestamp = { package = "pallet-timestamp", path = "../timestamp" }
+
+[features]
+default = ["std"]
+std = [
+    "serde",
+    "codec/std",
+    "sp-std/std",
+    "sp-io/std",
+    "sp-runtime/std",
+    "support/std",
+    "system/std",
+ ]

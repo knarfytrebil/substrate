@@ -1,0 +1,42 @@
+[package]
+name = "sc-mpc"
+version = "2.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2018"
+
+[dependencies]
+# 3rd party
+serde = "1.0.103"
+serde_json = "1.0.44"
+futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3.1", features = ["compat"]}
+futures-timer = "2.0.2"
+log = "0.4"
+parking_lot = "0.10"
+codec = { package = "parity-scale-codec", version = "1.1.0", features = ["derive"] }
+tokio = "0.2.4"
+
+# primitives
+sp-core = { path = "../../primitives/core" }
+sp-io = { path = "../../primitives/io" }
+sp-runtime = { path = "../../primitives/runtime"}
+sp-offchain = { path = "../../primitives/offchain"}
+sp-blockchain = { path = "../../primitives/blockchain" }
+sp-application-crypto = { path = "../../primitives/application-crypto"}
+sp-mpc = { path = "../../primitives/mpc" }
+
+# client
+sc-client-api = { path = "../api" }
+sc-client = { path = "../" }
+sc-keystore = { path = "../keystore" }
+sc-network = { path = "../network" }
+sc-network-gossip = { path = "../network-gossip"}
+
+[dependencies.curv]
+git = "https://github.com/KZen-networks/curv"
+tag = "v0.2.3"
+features =  ["ec_secp256k1"]
+
+[dependencies.multi-party-ecdsa]
+git = "https://github.com/KZen-networks/multi-party-ecdsa"
+tag = "v0.2.9"

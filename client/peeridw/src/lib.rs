@@ -2,13 +2,14 @@ use std::cmp::{Ord, Ordering, PartialOrd};
 use std::fmt;
 
 use derive_more::{From, Into};
-use parity_codec::{Decode, Encode, Error as CodecError, Input};
-use serde::de::Deserializer;
-use serde::de::Error as SerdeError;
-use serde::de::SeqAccess;
-use serde::de::Visitor;
-use serde::ser::SerializeSeq;
-use serde::Serializer;
+use codec::{Decode, Encode, Error as CodecError, Input};
+
+#[cfg(feature = "std")]
+use serde::de::{Deserializer,Error as SerdeError,SeqAccess,Visitor};
+#[cfg(feature = "std")]
+use serde::{ser::SerializeSeq,Serializer};
+
+#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
 use network::PeerId;
@@ -22,6 +23,22 @@ impl PartialOrd for PeerIdW
   fn partial_cmp(&self, other: &Self) -> Option<Ordering>
   {
     Some(self.cmp(other))
+  }
+}
+use rand::Rng;
+impl rand::distributions::Distribution<PeerIdW> for rand::distributions::Standard
+{
+  fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> PeerIdW
+  {
+    PeerIdW(PeerId::random())
+  }
+}
+
+impl rand::distributions::Distribution<PeerIdW> for PeerIdW
+{
+  fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> PeerIdW
+  {
+    PeerIdW(PeerId::random())
   }
 }
 
@@ -67,6 +84,7 @@ impl Decode for PeerIdW
   }
 }
 
+#[cfg(feature = "std")]
 impl Serialize for PeerIdW
 {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -86,6 +104,7 @@ impl Serialize for PeerIdW
 
 struct PeerIdVisitor;
 
+#[cfg(feature = "std")]
 impl<'de> Visitor<'de> for PeerIdVisitor
 {
   type Value = PeerIdW;
@@ -112,6 +131,7 @@ impl<'de> Visitor<'de> for PeerIdVisitor
   }
 }
 
+#[cfg(feature = "std")]
 impl<'de> Deserialize<'de> for PeerIdW
 {
   fn deserialize<D>(deserializer: D) -> Result<PeerIdW, D::Error>

@@ -3,26 +3,36 @@ use std::{
 	fmt::Debug,
 	marker::Unpin,
 	pin::Pin,
-	//sync::Arc,
+	sync::Arc,
 	time::{Duration, Instant},
 };
 
-//use codec::{Decode, Encode};
+use codec::{Decode, Encode};
 
-use futures03::compat::{ Stream01CompatExt};//Compat
-use futures03::prelude::{Stream, };//TryStream
-use futures03::stream::{ Fuse, StreamExt, };//FilterMap, TryStreamExt
-use futures03::task::{Context, Poll};
+use futures::future::FutureExt;
+use futures::prelude::{Stream, TryStream};
+use futures::stream::{FilterMap, Fuse, StreamExt, TryStreamExt};
+use futures::task::{Context, Poll};
+use futures_timer::Delay;
 
-// TODO change to tokio 0.2's interval when runtime changed to 0.2
-use tokio_timer::Interval as Interval01;
+pub type Interval = Box<dyn Stream<Item = ()> + Unpin + Send + Sync>;
+
+pub fn interval_at(start: Instant, duration: Duration) -> Interval {
+	let stream = futures::stream::unfold(start, move |next| {
+		let time_until_next = next.saturating_duration_since(Instant::now());
+
+		Delay::new(time_until_next).map(move |_| Some(((), next + duration)))
+	});
+
+	Box::new(stream)
+}
 
 pub struct PeriodicStream<S, M>
 where
 	S: Stream<Item = M>,
 {
 	incoming: Fuse<S>,
-	check_pending: Pin<Box<dyn Stream<Item = Result<Instant, tokio_timer::Error>> + Send>>,
+	check_pending: Interval,
 	ready: VecDeque<M>,
 }
 
@@ -35,7 +45,7 @@ where
 
 		Self {
 			incoming: stream.fuse(),
-			check_pending: Interval01::new_interval(dur).compat().boxed(),
+			check_pending: interval_at(Instant::now(), dur),
 			ready: VecDeque::new(),
 		}
 	}
@@ -53,23 +63,25 @@ where
 			match self.incoming.poll_next_unpin(cx) {
 				Poll::Ready(None) => break,
 				Poll::Ready(Some(input)) => {
-					let ready = &mut self.ready;
-					ready.push_back(input);
+					self.ready.push_back(input);
 				}
 				Poll::Pending => break,
 			}
 		}
 
-		if let Some(_) = match self.check_pending.poll_next_unpin(cx) {
-			Poll::Ready(r) => match r.unwrap() {
-				Ok(instant) => Some(instant),
-				Err(e) => panic!(e),
-			},
-			Poll::Pending => return { Poll::Pending },
-		} {}
+		let mut is_ready = false;
+		if let Poll::Ready(Some(_)) = self.check_pending.poll_next_unpin(cx) {
+			is_ready = true;
+		}
+
+		println!("ready? {:?}", is_ready);
 
 		if let Some(ready) = self.ready.pop_front() {
 			return Poll::Ready(Some(ready));
+		}
+
+		if !is_ready {
+			return Poll::Pending;
 		}
 
 		if self.incoming.is_done() {
@@ -82,19 +94,16 @@ where
 
 #[cfg(test)]
 mod test {
-
-	use futures03::{
+	use futures::compat::{Compat, Stream01CompatExt};
+	use futures::{
 		future::{self, Future, FutureExt, TryFutureExt},
 		stream,
 	};
-	use tokio::runtime::Runtime as Runtime01;
 
 	use super::*;
 
 	#[test]
 	fn test_periodic() {
-		let mut rt01 = Runtime01::new().unwrap();
-
 		struct F<S>
 		where
 			S: Stream<Item = u8>,
@@ -130,11 +139,9 @@ mod test {
 
 		let s = stream::repeat(1u8).take(5);
 		let f = F {
-			s: PeriodicStream::<_, u8>::new(s, 5),
+			s: PeriodicStream::<_, _>::new(s, 5),
 		};
 
-		let _ = rt01
-			.block_on(f.map(|_| -> Result<(), ()> { Ok(()) }).compat())
-			.unwrap();
+		futures::executor::block_on(f);
 	}
 }

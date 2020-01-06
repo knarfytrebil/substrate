@@ -1,41 +1,32 @@
 use std::{
 	collections::VecDeque,
-	marker::{ Unpin},//PhantomData
+	marker::{PhantomData, Unpin},
 	pin::Pin,
-	//str::FromStr,
+	str::FromStr,
 	sync::Arc,
 };
 
-//use codec::{Decode, Encode};
-//use curv::GE;
-//use client::backend::OffchainStorage;
-
-//use futures03::channel::mpsc;
-use futures03::prelude::{Future, Sink, Stream, };//TryStream
-use futures03::stream::{ StreamExt, }; //FilterMap, TryStreamExt
-use futures03::task::{Context, Poll};
-
-use log::{ error, info, };//debug, warn
+use codec::{Decode, Encode};
+use curv::GE;
+use futures::channel::mpsc;
+use futures::prelude::{Future, Sink, Stream, TryStream};
+use futures::stream::{FilterMap, StreamExt, TryStreamExt};
+use futures::task::{Context, Poll};
+use log::{debug, error, info, warn};
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2018::party_i::{Keys, Parameters};
-//use rand::prelude::Rng;
 
-use sc_api::{Backend,AuxStore,};
-use primitives::offchain::OffchainStorage;
-
-
-use client::{
-	CallExecutor,  //error::Error as ClientError, BlockchainEvents,error::Result as ClientResult, Client
-};
-//use consensus_common::SelectChain;
-//use inherents::InherentDataProviders;
-use network::PeerId;
-use primitives::{Blake2Hasher, H256};
-//use sr_primitives::generic::BlockId;
-use sp_runtime::traits::{Block as BlockT, }; //NumberFor, ProvideRuntimeApi
+use sc_client::Client;
+use sc_client_api::{backend::Backend, BlockchainEvents, CallExecutor};
+use sc_network::PeerId;
+use sc_network_gossip::Network;
+use sp_blockchain::{Error as ClientError, HeaderBackend, Result as ClientResult};
+use sp_core::{offchain::OffchainStorage, Blake2Hasher, H256};
+use sp_runtime::generic::BlockId;
+use sp_runtime::traits::{Block as BlockT, NumberFor, ProvideRuntimeApi};
 
 use super::{
 	ConfirmPeersMessage, Environment, Error, GossipMessage, KeyGenMessage, MessageWithSender,
-	Network, PeerIndex, // SignMessage,
+	PeerIndex, SignMessage,
 };
 
 struct Buffered<Item, S>
@@ -45,8 +36,6 @@ where
 	inner: S,
 	buffer: VecDeque<Item>,
 }
-
-// impl<Item, S> Unpin for Buffered<Item, S> where S: Sink<Item, Error = Error> + Unpin {}
 
 impl<Item, S> Buffered<Item, S>
 where
@@ -78,14 +67,14 @@ where
 			Poll::Ready(r) => {
 				match Pin::new(&mut self.inner).poll_flush(cx) {
 					Poll::Pending => return Poll::Pending,
-					Poll::Ready(_r) => {}
+					Poll::Ready(r) => {}
 				}
 				Poll::Ready(r)
 			}
 			Poll::Pending => {
 				match Pin::new(&mut self.inner).poll_flush(cx) {
 					Poll::Pending => return Poll::Pending,
-					Poll::Ready(_r) => {}
+					Poll::Ready(r) => {}
 				}
 				Poll::Pending
 			}
@@ -128,33 +117,31 @@ where
 	}
 }
 
-pub(crate) struct Signer<B, E, Block: BlockT, N: Network<Block>, RA, In, Out,Storage>
+pub(crate) struct Signer<B, E, Block: BlockT, RA, In, Out, Storage>
 where
 	In: Stream<Item = MessageWithSender>,
 	Out: Sink<MessageWithSender, Error = Error>,
 {
-	env: Arc<Environment<B, E, Block, N, RA,Storage>>,
+	env: Arc<Environment<B, E, Block, RA, Storage>>,
 	global_in: In,
 	global_out: Buffered<MessageWithSender, Out>,
 	should_rebuild: bool,
 	last_message_ok: bool,
 }
 
-impl<B, E, Block, N, RA, In, Out,Storage> Signer<B, E, Block, N, RA, In, Out,Storage>
+impl<B, E, Block, RA, In, Out, Storage> Signer<B, E, Block, RA, In, Out, Storage>
 where
 	B: Backend<Block, Blake2Hasher> + 'static,
 	E: CallExecutor<Block, Blake2Hasher> + Send + Sync + 'static,
 	Block: BlockT<Hash = H256>,
 	Block::Hash: Ord,
-	N: Network<Block> + Sync,
-	N::In: Send + 'static,
 	RA: Send + Sync + 'static,
 	In: Stream<Item = MessageWithSender> + Unpin,
 	Out: Sink<MessageWithSender, Error = Error> + Unpin,
-	Storage:OffchainStorage,
+	Storage: OffchainStorage,
 {
 	pub fn new(
-		env: Arc<Environment<B, E, Block, N, RA,Storage>>,
+		env: Arc<Environment<B, E, Block, RA, Storage>>,
 		global_in: In,
 		global_out: Out,
 		last_message_ok: bool,
@@ -202,7 +189,7 @@ where
 		if res.is_err() {
 			println!("{:?} \n {:?} \n {:?}", secret_shares, vsss, res);
 			panic!("ss error of {:?}", key.party_index);
-		//	return;
+			return;
 		}
 
 		let (shared_keys, proof) = res.unwrap();
@@ -231,7 +218,7 @@ where
 		let players = self.env.config.players;
 
 		match cpm {
-			ConfirmPeersMessage::Confirming(_from_index) => {
+			ConfirmPeersMessage::Confirming(from_index) => {
 				println!("recv confirming msg");
 				// let sender = sender.clone().unwrap();
 
@@ -436,7 +423,7 @@ where
 		match msg {
 			GossipMessage::ConfirmPeers(cpm, all_peers_hash) => {
 				let validator = self.env.bridge.validator.inner.read();
-				let _our_hash = validator.get_peers_hash();
+				let our_hash = validator.get_peers_hash();
 
 				println!("cpm msg local state {:?}", validator.local_state());
 
@@ -465,14 +452,12 @@ where
 	}
 }
 
-impl<B, E, Block, N, RA, In, Out,Storage> Future for Signer<B, E, Block, N, RA, In, Out,Storage>
+impl<B, E, Block, RA, In, Out, Storage> Future for Signer<B, E, Block, RA, In, Out, Storage>
 where
 	B: Backend<Block, Blake2Hasher> + 'static,
 	E: CallExecutor<Block, Blake2Hasher> + Send + Sync + 'static,
 	Block: BlockT<Hash = H256>,
 	Block::Hash: Ord,
-	N: Network<Block> + Sync,
-	N::In: Send + 'static,
 	RA: Send + Sync + 'static,
 	In: Stream<Item = MessageWithSender> + Unpin,
 	Out: Sink<MessageWithSender, Error = Error> + Unpin,

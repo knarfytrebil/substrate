@@ -23,7 +23,7 @@ use std::{fmt::{Debug, Display}, panic::UnwindSafe};
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
-pub use externalities::{Externalities, ExternalitiesExt};
+pub use sp_externalities::{Externalities, ExternalitiesExt};
 
 /// Something that generates, stores and provides access to keys.
 pub trait BareCryptoStore: Send + Sync {
@@ -104,7 +104,7 @@ pub trait BareCryptoStore: Send + Sync {
 /// A pointer to the key store.
 pub type BareCryptoStorePtr = Arc<parking_lot::RwLock<dyn BareCryptoStore>>;
 
-externalities::decl_extension! {
+sp_externalities::decl_extension! {
 	/// The keystore extension to register/retrieve from the externalities.
 	pub struct KeystoreExt(BareCryptoStorePtr);
 }

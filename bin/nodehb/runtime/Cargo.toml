@@ -55,7 +55,8 @@ randomness-collective-flip = { package = "pallet-randomness-collective-flip", pa
 transaction-payment = { package = "pallet-transaction-payment", path = "../../../frame/transaction-payment", default-features = false }
 substrate-mpecdsa-primitives={ path = "../../../primitives/keygen", default-features = false }
 pallet-badger = { package = "pallet-badger", path = "../../../frame/hbbft", default-features = false }
-pallet-keygen = { package = "pallet-keygen", path = "../../../frame/keygen", default-features = false }
+mpc = { package = "pallet-mpc", path = "../../../frame/mpc", default-features = false }
+sp-mpc = { package = "sp-mpc", path = "../../../primitives/mpc", default-features = false }
 
 [build-dependencies]
 wasm-builder-runner = { package = "substrate-wasm-builder-runner", path = "../../../utils/wasm-builder-runner", version = "1.0.4" }
@@ -99,7 +100,7 @@ std = [
 	"sp-session/std",
 	"session/std",
 	"pallet-badger/std",
-	"pallet-keygen/std",
+	"mpc/std",
 	"randomness-collective-flip/std",
 	"transaction-payment/std",
 	"system-rpc-runtime-api/std",

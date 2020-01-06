@@ -35,13 +35,14 @@ use codec::{self as codec,  Encode,Decode }; //Decode,Error,Codec,
 use rstd::collections::btree_map::BTreeMap;
 use rstd::prelude::*;
 use session::OnSessionEnding;
+use frame_support::dispatch::DispatchError;
 use sp_runtime::{
   generic::{DigestItem, },
   //traits::Zero,
  // Perbill,
 };//OpaqueDigestItemId
 use frame_support::{
-  decl_event, decl_module, decl_storage, dispatch::Result, storage,  storage::StorageValue,
+  decl_event, decl_module, decl_storage, dispatch::DispatchResult, storage,  storage::StorageValue,
 };
 //storage::StorageMap,
 
@@ -112,7 +113,7 @@ decl_module! {
 	}
 	
 	///Remove account binding for submitting account
-	fn remove_account_binding(origin) -> Result
+	fn remove_account_binding(origin) -> DispatchResult
 	{
 		let who=ensure_signed(origin)?;
 		let mut auth_map:BTreeMap<T::AccountId,AuthorityId>=storage::unhashed::get_or_default::<BTreeMap<T::AccountId,AuthorityId>>(HBBFT_AUTHORITIES_MAP_KEY).into();
@@ -129,7 +130,7 @@ decl_module! {
 
 		}
 	}
-    fn submit_account_binding(origin,binding: SignedAccountBinding<T::AccountId>) -> Result
+    fn submit_account_binding(origin,binding: SignedAccountBinding<T::AccountId>) -> DispatchResult
     {
      let who=ensure_signed(origin)?;
      let signature_valid = binding.data.using_encoded(|encoded_data| {
@@ -167,7 +168,7 @@ decl_module! {
 	
 
   //	Self::deposit_log(ConsensusLog::Resume(delay));
-  fn send_log(_origin) ->Result
+  fn send_log(_origin) ->DispatchResult
   {
     print_utf8(b"RUNEXTR");
   //let who =	ensure_signed(origin)?;
@@ -179,7 +180,7 @@ decl_module! {
   
 
     /// vote to add authority
-	pub fn vote_to_add(origin, new_auth_id: T::AccountId)->Result
+	pub fn vote_to_add(origin, new_auth_id: T::AccountId)->DispatchResult
 	{
 		let who=ensure_signed(origin)?;
 		#[cfg(feature = "std")]
@@ -191,7 +192,7 @@ decl_module! {
 					///panic!("Invalid ids provided");
 					#[cfg(feature = "std")]
 					print!("ERROR: Invalid ids provided");
-					return Err("Invalid ids provided");
+					Err("Invalid ids provided")?;
 				}
 				let new_auth=new_ids[0];
 				if c_auths.iter().find(|x| *x==new_auth).is_some()
@@ -207,7 +208,7 @@ decl_module! {
 	}
 
 	    /// vote to remove authority
-		pub fn vote_to_remove(origin, new_auth_id: T::AccountId)->Result
+		pub fn vote_to_remove(origin, new_auth_id: T::AccountId)->DispatchResult
 		{
 			let who=ensure_signed(origin)?;
 			#[cfg(feature = "std")]
@@ -220,7 +221,7 @@ decl_module! {
 					{
 						#[cfg(feature = "std")]
 						print!("EA: Not in val set {:?}",&c_auths);
-						return Err("Invalid ids provided");
+						Err("Invalid ids provided")?;
 					}
 					let new_auth=new_ids[0];
 					let pos = match c_auths.iter().position(|x| *x == *new_auth)
@@ -246,7 +247,7 @@ decl_module! {
 
 
 	    /// vote to replace authority set
-		pub fn vote_to_change(origin, new_auth_ids: Vec<T::AccountId>)->Result
+		pub fn vote_to_change(origin, new_auth_ids: Vec<T::AccountId>)
 		{
 			let who=ensure_signed(origin)?;
 			Self::update_vote_set(&who,new_auth_ids,|c_auths,new_ids|
@@ -262,7 +263,7 @@ decl_module! {
 					}
 					Ok(())
 				}
-			)	  
+			);	  
 		}
 
   //fn vote_for_auth
@@ -278,7 +279,7 @@ impl<T: Trait> sp_runtime::BoundToRuntimeAppPublic for Module<T>
 impl<T: Trait> Module<T>
 {
 
-	pub fn update_vote_set(who:&T::AccountId,new_auth_ids: Vec<T::AccountId>,mut how: impl FnMut(&mut Vec<AuthorityId>, Vec<&AuthorityId>)->Result )->Result
+	pub fn update_vote_set(who:&T::AccountId,new_auth_ids: Vec<T::AccountId>,mut how: impl FnMut(&mut Vec<AuthorityId>, Vec<&AuthorityId>)->DispatchResult )->DispatchResult
 	{
 		if let Some(our_authid)= Self::is_account_authority(&who)
 		{

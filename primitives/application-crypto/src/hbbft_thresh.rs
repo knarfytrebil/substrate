@@ -18,7 +18,7 @@
 
 use crate::{KeyTypeId, RuntimePublic};
 
-pub use primitives::hbbft_thresh::*;
+pub use sp_core::hbbft_thresh::*;
 
 mod app {
 	use crate::key_types::HB_NODE;

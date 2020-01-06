@@ -1,11 +1,11 @@
-//use std::cmp::{min, Ordering};
+use std::cmp::{min, Ordering};
 use std::collections::{hash_map::DefaultHasher, BTreeSet, HashMap};
-//use std::convert::From;
+use std::convert::From;
 use std::hash::{Hash, Hasher};
 use std::iter::Iterator;
 use std::str::FromStr;
 
-use network::{ PeerId};//config::Roles,
+use sc_network::{config::Roles, PeerId};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum PeerState {
@@ -65,7 +65,6 @@ impl Peers {
 		self.map.len()
 	}
 
-	#[allow(dead_code)]
 	pub fn iter(&self) -> impl Iterator<Item = (&PeerId, &PeerInfo)> {
 		self.map.iter()
 	}
@@ -78,7 +77,6 @@ impl Peers {
 		self.map.keys()
 	}
 
-    #[allow(dead_code)]
 	pub fn get_state(&self, who: &PeerId) -> Option<PeerState> {
 		let peer = self.map.get(who);
 		peer.map(|p| p.state)

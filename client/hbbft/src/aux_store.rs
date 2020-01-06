@@ -22,7 +22,10 @@ use parking_lot::RwLock;
 use parity_codec::{Encode, Decode};
 use sc_api::{Backend,AuxStore};
 use sp_blockchain::{Result as ClientResult, Error as ClientError};
-
+use runtime_primitives::{
+	generic::{OpaqueDigestItemId},
+	 Justification,
+};
 //use fork_tree::ForkTree;
 use runtime_primitives::traits::{Block as BlockT, };
 use log::{info, };
@@ -64,6 +67,39 @@ pub(crate) fn load_decode<B: AuxStore, T: Decode>(backend: &B, key: &[u8]) -> Cl
 }
 pub  struct BadgerSharedAuthoritySet {
 	pub inner: Arc<RwLock<AuthoritySet>>,
+}
+impl BadgerSharedAuthoritySet
+{
+	pub fn verify_full_justification<B:BlockT>(&self, just_dat:Justification) ->bool
+	{
+		use crate::communication::gossip::BadgerFullJustification;
+		let just: BadgerFullJustification<B>= match Decode::decode(&mut &just_dat[..])
+		{
+			Ok(dat) => dat,
+			Err(_) => return false,
+		};
+	  if !just.verify()
+	  {
+		return false;
+	  }
+   
+	 let mut count_total=0;
+	 let mut count_accepted=0;
+	 for authority in self.inner.read().current_authorities.iter()
+	 {
+	   count_total+=1;
+	   if just.commits.iter().find( |x| 
+		 {
+		  x.validator==*authority
+	   } ).is_some()
+	   {
+		 count_accepted+=1;
+	   }
+	 }
+	 let tolerated= count_total - badger::util::max_faulty(count_total);
+	  
+	 count_accepted>=tolerated
+	  }
 }
 
 impl Clone for BadgerSharedAuthoritySet

@@ -20,9 +20,9 @@ use ansi_term::Style;
 use rand::{Rng, distributions::Alphanumeric, rngs::OsRng};
 use structopt::StructOpt;
 
-use keystore::{Store as Keystore};
+use sc_keystore::{Store as Keystore};
 use node_cli::chain_spec::{self, AccountId};
-use primitives::{sr25519, crypto::{Public, Ss58Codec}, traits::BareCryptoStore};
+use sp_core::{sr25519, crypto::{Public, Ss58Codec}, traits::BareCryptoStore};
 
 /// A utility to easily create a testnet chain spec definition with a given set
 /// of authorities and endowed accounts and/or generate random accounts.
@@ -141,7 +141,7 @@ fn generate_authority_keys_and_store(
 			None,
 		).map_err(|err| err.to_string())?;
 
-		let (_, _, grandpa, babe, im_online, authority_discovery) =
+		let (_, _, grandpa, babe, im_online, authority_discovery, mpc) =
 			chain_spec::get_authority_keys_from_seed(seed);
 
 		let insert_key = |key_type, public| {
@@ -153,23 +153,29 @@ fn generate_authority_keys_and_store(
 		};
 
 		insert_key(
-			primitives::crypto::key_types::BABE,
+			sp_core::crypto::key_types::BABE,
 			babe.as_slice(),
 		)?;
 
 		insert_key(
-			primitives::crypto::key_types::GRANDPA,
+			sp_core::crypto::key_types::GRANDPA,
 			grandpa.as_slice(),
 		)?;
 
 		insert_key(
-			primitives::crypto::key_types::IM_ONLINE,
+			sp_core::crypto::key_types::IM_ONLINE,
 			im_online.as_slice(),
 		)?;
 
 		insert_key(
-			primitives::crypto::key_types::AUTHORITY_DISCOVERY,
+			sp_core::crypto::key_types::AUTHORITY_DISCOVERY,
 			authority_discovery.as_slice(),
+		)?;
+
+
+		insert_key(
+			sp_mpc::KEY_TYPE,
+			mpc.as_slice(),
 		)?;
 	}
 
@@ -218,7 +224,7 @@ fn main() -> Result<(), String> {
 		 ensure proper functioning of the included runtime compile (or run) the chain spec builder binary in \
 		 `--release` mode.\n",
 	);
-
+	println!("test");
 	let builder = ChainSpecBuilder::from_args();
 	let chain_spec_path = builder.chain_spec_path().to_path_buf();
 
@@ -259,6 +265,7 @@ fn main() -> Result<(), String> {
 			(authority_seeds, endowed_accounts, sudo_account)
 		},
 		ChainSpecBuilder::New { authority_seeds, endowed_accounts, sudo_account, .. } => {
+			println!("new");
 			(authority_seeds, endowed_accounts, sudo_account)
 		},
 	};

@@ -3,6 +3,10 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+
+
+
+
 use sp_runtime::{ConsensusEngineId, };
 use sp_runtime::{RuntimeDebug, };
 
@@ -133,6 +137,9 @@ where AccountId:Encode+Decode+core::fmt::Debug
 	pub data:AccountBinding<AccountId>,
 	pub sig:AuthoritySignature,
 }
+
+
+
 
 
 decl_runtime_apis! {

@@ -34,7 +34,7 @@ use contracts_rpc_runtime_api::ContractExecResult;
 use hb_node_primitives::{
 	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, Moment, Signature,
 };
-pub use pallet_keygen::sr25519::AuthorityId as KeygenId;
+pub use sp_mpc::AuthorityId as KeygenId;
 use inherents::{CheckInherentsResult,InherentData};
 
 use elections::VoteIndex;
@@ -126,6 +126,7 @@ impl system::Trait for Runtime {
 	type MaximumBlockLength = MaximumBlockLength;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = Version;
+	type ModuleToIndex = ModuleToIndex;
 }
 
 impl contracts::Trait for Runtime {
@@ -262,10 +263,9 @@ impl pallet_badger::Trait for Runtime {
 }
 use system::offchain::TransactionSubmitter;
 
-type SubmitTransaction = TransactionSubmitter<KeygenId, Runtime, UncheckedExtrinsic>;
-impl pallet_keygen::Trait for Runtime {
+type SubmitTransaction = TransactionSubmitter<mpc::crypto::Public, Runtime, UncheckedExtrinsic>;
+impl mpc::Trait for Runtime {
 	type Event = Event;
-	type AuthorityId = KeygenId;
 	type Call = Call;
 	type SubmitTransaction = SubmitTransaction;
 }
@@ -292,7 +292,7 @@ construct_runtime!(
 		Authorship: authorship::{Module, Call, Storage, Inherent},
 		Badger: pallet_badger::{Module, Call, Storage, Event},
 		Session: session::{Module, Call, Storage, Event, Config<T>},
-		Keygen: pallet_keygen::{Module, Call, Storage, Event,ValidateUnsigned},
+		Keygen: mpc::{Module, Call, Storage, Event<T>},
 		Indices: indices,
 		Balances: balances,
 		Contracts: contracts,
@@ -506,4 +506,41 @@ impl_runtime_apis! {
 
 
 	}*/
+}
+use sp_runtime::traits::{
+	self,
+	SaturatedConversion,
+
+};
+/// The payload being signed in transactions.
+pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
+
+impl system::offchain::CreateTransaction<Runtime, UncheckedExtrinsic> for Runtime {
+	type Public = <Signature as traits::Verify>::Signer;
+	type Signature = Signature;
+
+	fn create_transaction<TSigner: system::offchain::Signer<Self::Public, Self::Signature>>(
+		call: Call,
+		public: Self::Public,
+		account: AccountId,
+		index: Index,
+	) -> Option<(Call, <UncheckedExtrinsic as traits::Extrinsic>::SignaturePayload)> {
+		let period = 1 << 8;
+		let current_block = System::block_number().saturated_into::<u64>();
+		let tip = 0;
+		let extra: SignedExtra = (
+			system::CheckVersion::<Runtime>::new(),
+			system::CheckGenesis::<Runtime>::new(),
+			system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
+			system::CheckNonce::<Runtime>::from(index),
+			system::CheckWeight::<Runtime>::new(),
+			transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+			Default::default(),
+		);
+		let raw_payload = SignedPayload::new(call, extra).ok()?;
+		let signature = TSigner::sign(public, &raw_payload)?;
+		let address = Indices::unlookup(account);
+		let (call, extra, _) = raw_payload.deconstruct();
+		Some((call, (address, signature, extra)))
+	}
 }

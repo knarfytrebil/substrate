@@ -20,8 +20,8 @@ use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 pub use sc_cli::{VersionInfo, IntoExit, NoCustom, SharedParams, };
 use sc_service::{AbstractService, Roles as ServiceRoles, Configuration};
 use log::info;
-use structopt::{StructOpt, clap::App};
-use sc_cli::{display_role, parse_and_prepare, AugmentClap, GetLogFilter, ParseAndPrepare};
+use structopt::{StructOpt, StructOptInternal, clap::App};
+use sc_cli::{display_role, parse_and_prepare, GetLogFilter, ParseAndPrepare};
 use crate::{service, ChainSpec, load_spec};
 use crate::factory_impl::FactoryState;
 use transaction_factory::RuntimeAdapter;
@@ -91,11 +91,11 @@ pub struct FactoryCmd {
 	pub import_params: ImportParams,
 }
 
-impl AugmentClap for FactoryCmd {
-	fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
-		FactoryCmd::augment_clap(app)
-	}
-}
+// impl StructOptInternal for FactoryCmd {
+// 	fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
+// 		FactoryCmd::augment_clap(app)
+// 	}
+// }
 
 
 

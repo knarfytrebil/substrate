@@ -39,14 +39,14 @@ use parking_lot::Mutex;
 use threadpool::ThreadPool;
 use sp_api::ApiExt;
 use futures::future::Future;
-use log::{debug, warn,};//info
-use network::NetworkStateInfo;
-use primitives::{offchain::{self, OffchainStorage}, ExecutionContext};
+use log::{debug, warn};
+use sc_network::NetworkStateInfo;
+use sp_core::{offchain::{self, OffchainStorage}, ExecutionContext};
 use sp_runtime::{generic::BlockId, traits::{self, ProvideRuntimeApi}};
 
 mod api;
 
-pub use offchain_primitives::{OffchainWorkerApi, STORAGE_PREFIX};
+pub use sp_offchain::{OffchainWorkerApi, STORAGE_PREFIX};
 
 /// An offchain workers manager.
 pub struct OffchainWorkers<Client, Storage, Block: traits::Block> {
@@ -99,7 +99,7 @@ impl<Client, Storage, Block> OffchainWorkers<
 		let runtime = self.client.runtime_api();
 		let at = BlockId::number(*number);
 		let has_api = runtime.has_api::<dyn OffchainWorkerApi<Block, Error = ()>>(&at);
-		debug!("Checking offchain workers at {:?}: {:?}", at, has_api);
+		warn!("Checking offchain workers at {:?}: {:?}", at, has_api);
 
 		if has_api.unwrap_or(false) {
 			let (api, runner) = api::AsyncApi::new(
@@ -146,10 +146,10 @@ impl<Client, Storage, Block> OffchainWorkers<
 mod tests {
 	use super::*;
 	use std::sync::Arc;
-	use network::{Multiaddr, PeerId};
-	use test_client::runtime::Block;
-	use txpool::{BasicPool, FullChainApi};
-	use txpool_api::{TransactionPool, InPoolTransaction};
+	use sc_network::{Multiaddr, PeerId};
+	use substrate_test_runtime_client::runtime::Block;
+	use sc_transaction_pool::{BasicPool, FullChainApi};
+	use sp_transaction_pool::{TransactionPool, InPoolTransaction};
 
 	struct MockNetworkStateInfo();
 
@@ -163,9 +163,9 @@ mod tests {
 		}
 	}
 
-	struct TestPool(BasicPool<FullChainApi<test_client::TestClient, Block>, Block>);
+	struct TestPool(BasicPool<FullChainApi<substrate_test_runtime_client::TestClient, Block>, Block>);
 
-	impl txpool_api::OffchainSubmitTransaction<Block> for TestPool {
+	impl sp_transaction_pool::OffchainSubmitTransaction<Block> for TestPool {
 		fn submit_at(
 			&self,
 			at: &BlockId<Block>,
@@ -181,11 +181,11 @@ mod tests {
 	fn should_call_into_runtime_and_produce_extrinsic() {
 		// given
 		let _ = env_logger::try_init();
-		let client = Arc::new(test_client::new());
+		let client = Arc::new(substrate_test_runtime_client::new());
 		let pool = Arc::new(TestPool(BasicPool::new(Default::default(), FullChainApi::new(client.clone()))));
 		client.execution_extensions()
 			.register_transaction_pool(Arc::downgrade(&pool.clone()) as _);
-		let db = client_db::offchain::LocalStorage::new_test();
+		let db = sc_client_db::offchain::LocalStorage::new_test();
 		let network_state = Arc::new(MockNetworkStateInfo());
 
 		// when

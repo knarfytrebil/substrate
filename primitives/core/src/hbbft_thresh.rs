@@ -22,7 +22,7 @@ use crate::{
 	crypto::{DeriveJunction, Pair as TraitPair, SecretStringError},
 	};
 
-use runtime_interface::pass_by::PassByInner;
+use sp_runtime_interface::pass_by::PassByInner;
 
 #[cfg(feature = "std")]
 use crate::crypto::Ss58Codec;

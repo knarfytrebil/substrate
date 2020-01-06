@@ -33,7 +33,7 @@ use sp_runtime::{RuntimeDebug,
  // Perbill,
 };
 use frame_support::{
-  decl_event, decl_module, decl_storage, dispatch::Result as dresult, ensure, print,
+  decl_event, decl_module, decl_storage, dispatch::DispatchResult as dresult, ensure, print,
    storage::StorageValue, Parameter, //storage::StorageMap,
 };
 use substrate_mpecdsa_primitives::{
@@ -213,7 +213,7 @@ decl_module! {
   runtime_io::offchain::local_storage_set(kind,&a,b"new");
     if <Self as Store>::RequestResults::exists(req_id)
     {
-      return Err("Duplicate request ID");
+      return Err("Duplicate request ID")?;
     }
     let a:Option<[u8;32]>=None;
     <Self as Store>::RequestResults::insert(req_id,&a);

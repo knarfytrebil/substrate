@@ -11,6 +11,7 @@ unsigned-varint = { version = "0.2.2", features = ["codec"] }
 fork-tree = { path = "../../utils/fork-tree" }
 futures03 = { package = "futures", version = "0.3.1", features = ["compat"] }
 log = "0.4"
+hash-db = { version = "0.15.2"}
 parking_lot = "0.9.0"
 jsonrpc-core = "14.0.3"
 jsonrpc-core-client = "14.0.3"
@@ -34,10 +35,11 @@ substrate-telemetry = { package = "sc-telemetry",path = "../telemetry" }
 serde = { version = "1.0.102", features = ["derive"] }
 serde_json = "1.0"
 block-builder = { package = "sc-block-builder", path = "../block-builder" }
+sc-network-ranting = { path = "../network-ranting"}
 
 client = { package = "sc-client", path = "../../client/" }
 inherents = { package = "sp-inherents", path = "../../primitives/inherents" }
-network = { package = "sc-network", path = "../network", features = ["upgraded"] }
+network = { package = "sc-network", path = "../network" }
 keystore = { package = "sc-keystore", path = "../keystore" }
 service = { package = "sc-service", path = "../service", optional = true }
 srml-finality-tracker = { package = "pallet-finality-tracker",path = "../../frame/finality-tracker" }
@@ -56,6 +58,8 @@ state_machine = { package = "sp-state-machine", path = "../../primitives/state-m
 app-crypto = { package = "sp-application-crypto", path = "../../primitives/application-crypto" }
 hex-literal = { version = "0.2.1" }
 sc-api={ package = "sc-client-api", path = "../api" }
+sc-peerid-wrapper = { package = "sc-peerid-wrapper", path = "../../client/peeridw" }
+
 
 [dev-dependencies]
 network = { package = "sc-network", path = "../network", features = ["test-helpers"] }

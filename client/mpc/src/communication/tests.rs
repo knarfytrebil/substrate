@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
 use codec::Encode;
-use futures::prelude::{Future as Future01, Sink as Sink01, Stream as Stream01};
-use futures::sync::mpsc as mpsc01;
-use futures03::channel::{mpsc, oneshot};
-use futures03::compat::{Compat, Compat01As03};
-use futures03::future::{FutureExt, Join};
-use futures03::prelude::{Future, Sink, Stream, TryFuture, TryStream};
-use futures03::sink::SinkExt;
-use futures03::stream::{FilterMap, StreamExt, TryStreamExt};
-use futures03::task::{Context, Poll};
+use futures::channel::{mpsc, oneshot};
+use futures::compat::{Compat, Compat01As03};
+use futures::future::{FutureExt, Join};
+use futures::prelude::{Future, Sink, Stream, TryFuture, TryStream};
+use futures::sink::SinkExt;
+use futures::stream::{FilterMap, StreamExt, TryStreamExt};
+use futures::task::{Context, Poll};
+use futures01::sync::mpsc as mpsc01;
 
-use tokio02::runtime::current_thread::Runtime;
+use tokio::runtime::current_thread::Runtime;
 
 use keyring::Ed25519Keyring;
 use network::{
@@ -106,7 +105,7 @@ impl Tester {
 		F: FnMut(Event) -> bool,
 	{
 		let mut s = Some(self);
-		futures03::future::poll_fn(move |_| loop {
+		futures::future::poll_fn(move |_| loop {
 			match s
 				.as_mut()
 				.unwrap()
@@ -139,7 +138,7 @@ fn make_test_network() -> impl Future<Output = Tester> {
 	let id = network::PeerId::random();
 	let bridge = super::NetworkBridge::new(net.clone(), config, id);
 
-	futures03::future::lazy(move |_| Tester {
+	futures::future::lazy(move |_| Tester {
 		gossip_validator: bridge.validator.clone(),
 		net_handle: bridge,
 		events: rx,
@@ -215,7 +214,7 @@ fn test_confirm_peer_message() {
 				})
 				.into_future();
 
-			futures03::future::join(send_message, handle_in)
+			futures::future::join(send_message, handle_in)
 			// .map_err(|_| panic!("could not watch for gossip message"))
 			// .map_ok(|_| ())
 		});

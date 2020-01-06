@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::traits::{AugmentClap, GetLogFilter};
+use crate::traits::{
+    GetLogFilter
+};
 
-use std::path::PathBuf;
-use structopt::{StructOpt, clap::{arg_enum, App, AppSettings, SubCommand, Arg}};
+use std::{str::FromStr, path::PathBuf};
+use structopt::{StructOpt, StructOptInternal, clap::{arg_enum, App, AppSettings, SubCommand, Arg}};
 
 pub use crate::execution_strategy::ExecutionStrategy;
 
@@ -32,13 +34,13 @@ macro_rules! impl_get_log_filter {
 	}
 }
 
-impl Into<client_api::ExecutionStrategy> for ExecutionStrategy {
-	fn into(self) -> client_api::ExecutionStrategy {
+impl Into<sc_client_api::ExecutionStrategy> for ExecutionStrategy {
+	fn into(self) -> sc_client_api::ExecutionStrategy {
 		match self {
-			ExecutionStrategy::Native => client_api::ExecutionStrategy::NativeWhenPossible,
-			ExecutionStrategy::Wasm => client_api::ExecutionStrategy::AlwaysWasm,
-			ExecutionStrategy::Both => client_api::ExecutionStrategy::Both,
-			ExecutionStrategy::NativeElseWasm => client_api::ExecutionStrategy::NativeElseWasm,
+			ExecutionStrategy::Native => sc_client_api::ExecutionStrategy::NativeWhenPossible,
+			ExecutionStrategy::Wasm => sc_client_api::ExecutionStrategy::AlwaysWasm,
+			ExecutionStrategy::Both => sc_client_api::ExecutionStrategy::Both,
+			ExecutionStrategy::NativeElseWasm => sc_client_api::ExecutionStrategy::NativeElseWasm,
 		}
 	}
 }
@@ -66,12 +68,12 @@ impl WasmExecutionMethod {
 	}
 }
 
-impl Into<service::config::WasmExecutionMethod> for WasmExecutionMethod {
-	fn into(self) -> service::config::WasmExecutionMethod {
+impl Into<sc_service::config::WasmExecutionMethod> for WasmExecutionMethod {
+	fn into(self) -> sc_service::config::WasmExecutionMethod {
 		match self {
-			WasmExecutionMethod::Interpreted => service::config::WasmExecutionMethod::Interpreted,
+			WasmExecutionMethod::Interpreted => sc_service::config::WasmExecutionMethod::Interpreted,
 			#[cfg(feature = "wasmtime")]
-			WasmExecutionMethod::Compiled => service::config::WasmExecutionMethod::Compiled,
+			WasmExecutionMethod::Compiled => sc_service::config::WasmExecutionMethod::Compiled,
 			#[cfg(not(feature = "wasmtime"))]
 			WasmExecutionMethod::Compiled => panic!(
 				"Substrate must be compiled with \"wasmtime\" feature for compiled Wasm execution"
@@ -443,15 +445,31 @@ pub struct RunCmd {
 
 	/// Listen to all RPC interfaces.
 	///
-	/// Default is local.
+	/// Default is local. Note: not all RPC methods are safe to be exposed publicly. Use a RPC proxy
+	/// server to filter out dangerous methods. More details: https://github.com/paritytech/substrate/wiki/Public-RPC.
+	/// Use `--unsafe-rpc-external` to suppress the warning if you understand the risks.
 	#[structopt(long = "rpc-external")]
 	pub rpc_external: bool,
 
+	/// Listen to all RPC interfaces.
+	///
+	/// Same as `--rpc-external`.
+	#[structopt(long = "unsafe-rpc-external")]
+	pub unsafe_rpc_external: bool,
+
 	/// Listen to all Websocket interfaces.
 	///
-	/// Default is local.
+	/// Default is local. Note: not all RPC methods are safe to be exposed publicly. Use a RPC proxy
+	/// server to filter out dangerous methods. More details: https://github.com/paritytech/substrate/wiki/Public-RPC.
+	/// Use `--unsafe-ws-external` to suppress the warning if you understand the risks.
 	#[structopt(long = "ws-external")]
 	pub ws_external: bool,
+
+	/// Listen to all Websocket interfaces.
+	///
+	/// Same as `--ws-external`.
+	#[structopt(long = "unsafe-ws-external")]
+	pub unsafe_ws_external: bool,
 
 	/// Listen to all Grafana data source interfaces.
 	///
@@ -593,19 +611,19 @@ struct KeyringTestAccountCliValues {
 	help: String,
 	conflicts_with: Vec<String>,
 	name: String,
-	variant: keyring::Sr25519Keyring,
+	variant: sp_keyring::Sr25519Keyring,
 }
 
 lazy_static::lazy_static! {
 	/// The Cli values for all test accounts.
 	static ref TEST_ACCOUNTS_CLI_VALUES: Vec<KeyringTestAccountCliValues> = {
-		keyring::Sr25519Keyring::iter().map(|a| {
+		sp_keyring::Sr25519Keyring::iter().map(|a| {
 			let help = format!(
 				"Shortcut for `--name {} --validator` with session keys for `{}` added to keystore.",
 				a,
 				a,
 			);
-			let conflicts_with = keyring::Sr25519Keyring::iter()
+			let conflicts_with = sp_keyring::Sr25519Keyring::iter()
 				.filter(|b| a != *b)
 				.map(|b| b.to_string().to_lowercase())
 				.chain(std::iter::once("name".to_string()))
@@ -625,7 +643,7 @@ lazy_static::lazy_static! {
 /// Wrapper for exposing the keyring test accounts into the Cli.
 #[derive(Debug, Clone)]
 pub struct Keyring {
-	pub account: Option<keyring::Sr25519Keyring>,
+	pub account: Option<sp_keyring::Sr25519Keyring>,
 }
 
 impl StructOpt for Keyring {
@@ -640,7 +658,7 @@ impl StructOpt for Keyring {
 	}
 }
 
-impl AugmentClap for Keyring {
+impl StructOptInternal for Keyring {
 	fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
 		TEST_ACCOUNTS_CLI_VALUES.iter().fold(app, |app, a| {
 			let conflicts_with_strs = a.conflicts_with.iter().map(|s| s.as_str()).collect::<Vec<_>>();
@@ -715,7 +733,7 @@ fn parse_cors(s: &str) -> Result<Cors, Box<dyn std::error::Error>> {
 	Ok(if is_all { Cors::All } else { Cors::List(origins) })
 }
 
-impl_augment_clap!(RunCmd);
+// impl_augment_clap!(RunCmd);
 impl_get_log_filter!(RunCmd);
 
 /// The `build-spec` command used to build a specification.
@@ -743,6 +761,41 @@ pub struct BuildSpecCmd {
 
 impl_get_log_filter!(BuildSpecCmd);
 
+/// Wrapper type of `String` which holds an arbitary sized unsigned integer formatted as decimal.
+#[derive(Debug, Clone)]
+pub struct BlockNumber(String);
+
+impl FromStr for BlockNumber {
+	type Err = String;
+
+	fn from_str(block_number: &str) -> Result<Self, Self::Err> {
+		if block_number.chars().any(|d| !d.is_digit(10)) {
+			Err(format!(
+				"Invalid block number: {}, expected decimal formatted unsigned integer",
+				block_number
+			))
+		} else {
+			Ok(Self(block_number.to_owned()))
+		}
+	}
+}
+
+impl BlockNumber {
+	/// Wrapper on top of `std::str::parse<N>` but with `Error` as a `String`
+	///
+	/// See `https://doc.rust-lang.org/std/primitive.str.html#method.parse` for more elaborate
+	/// documentation.
+	pub fn parse<N>(&self) -> Result<N, String>
+	where
+		N: FromStr,
+		N::Err: std::fmt::Debug,
+	{
+		self.0
+			.parse()
+			.map_err(|e| format!("BlockNumber: {} parsing failed because of {:?}", self.0, e))
+	}
+}
+
 /// The `export-blocks` command used to export blocks.
 #[derive(Debug, StructOpt, Clone)]
 pub struct ExportBlocksCmd {
@@ -754,13 +807,13 @@ pub struct ExportBlocksCmd {
 	///
 	/// Default is 1.
 	#[structopt(long = "from", value_name = "BLOCK")]
-	pub from: Option<u32>,
+	pub from: Option<BlockNumber>,
 
 	/// Specify last block number.
 	///
 	/// Default is best block.
 	#[structopt(long = "to", value_name = "BLOCK")]
-	pub to: Option<u32>,
+	pub to: Option<BlockNumber>,
 
 	/// Use JSON output rather than binary.
 	#[structopt(long = "json")]
@@ -826,7 +879,7 @@ impl_get_log_filter!(CheckBlockCmd);
 pub struct RevertCmd {
 	/// Number of blocks to revert.
 	#[structopt(default_value = "256")]
-	pub num: u32,
+	pub num: BlockNumber,
 
 	#[allow(missing_docs)]
 	#[structopt(flatten)]
@@ -883,7 +936,7 @@ pub enum CoreParams<CC, RP> {
 
 impl<CC, RP> StructOpt for CoreParams<CC, RP> where
 	CC: StructOpt + GetLogFilter,
-	RP: StructOpt + AugmentClap
+	RP: StructOpt + StructOptInternal
 {
 	fn clap<'a, 'b>() -> App<'a, 'b> {
 		RP::augment_clap(
@@ -967,7 +1020,7 @@ impl StructOpt for NoCustom {
 	}
 }
 
-impl AugmentClap for NoCustom {
+impl StructOptInternal for NoCustom {
 	fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
 		app
 	}
@@ -988,7 +1041,7 @@ pub struct MergeParameters<L, R> {
 	pub right: R,
 }
 
-impl<L, R> StructOpt for MergeParameters<L, R> where L: StructOpt + AugmentClap, R: StructOpt {
+impl<L, R> StructOpt for MergeParameters<L, R> where L: StructOpt + StructOptInternal, R: StructOpt {
 	fn clap<'a, 'b>() -> App<'a, 'b> {
 		L::augment_clap(R::clap())
 	}

@@ -1,21 +1,22 @@
-use codec::{Decode, Encode};
-use log::{debug,};//error, info, trace, warn};
-//use serde::{Deserialize, Serialize};
 use std::{
-	//collections::VecDeque,
+	collections::VecDeque,
 	marker::PhantomData,
 	str::FromStr,
 	time::{Duration, Instant},
 };
 
-use network::consensus_gossip::{self as network_gossip, MessageIntent, ValidatorContext};
-use network::{config::Roles, PeerId};
-use sp_runtime::traits::{Block as BlockT};
+use codec::{Decode, Encode};
+use log::{error, info, trace, warn};
+use serde::{Deserialize, Serialize};
+
+use sc_network::{config::Roles, PeerId};
+use sc_network_gossip::{GossipEngine, MessageIntent, ValidationResult, ValidatorContext};
+use sp_runtime::traits::Block as BlockT;
 
 use super::{
 	message::{ConfirmPeersMessage, KeyGenMessage, SignMessage},
 	peer::{PeerInfo, PeerState, Peers},
-	//string_topic,
+	string_topic,
 };
 
 const REBROADCAST_AFTER: Duration = Duration::from_secs(30);
@@ -185,7 +186,7 @@ impl<Block: BlockT> GossipValidator<Block> {
 	}
 }
 
-impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> {
+impl<Block: BlockT> sc_network_gossip::Validator<Block> for GossipValidator<Block> {
 	fn new_peer(&self, context: &mut dyn ValidatorContext<Block>, who: &PeerId, roles: Roles) {
 		if roles != Roles::AUTHORITY {
 			return;
@@ -199,6 +200,7 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 		if all_peers_len >= players {
 			panic!("peers enough");
 			// don't take > n peers
+			return;
 		}
 
 		inner.add_peer(who.clone());
@@ -232,22 +234,22 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 
 	fn validate(
 		&self,
-		_context: &mut dyn ValidatorContext<Block>,
-		_who: &PeerId,
+		context: &mut dyn ValidatorContext<Block>,
+		who: &PeerId,
 		mut data: &[u8],
-	) -> network_gossip::ValidationResult<Block::Hash> {
+	) -> ValidationResult<Block::Hash> {
 		let gossip_msg = GossipMessage::decode(&mut data);
 		if let Ok(gossip_msg) = gossip_msg {
 			let topic = super::string_topic::<Block>("hash");
 			match gossip_msg {
 				// GossipMessage::ConfirmPeers(_, _) => {
-				// 	return network_gossip::ValidationResult::ProcessAndDiscard(topic);
+				// 	return ValidationResult::ProcessAndDiscard(topic);
 				// }
 				_ => {}
 			}
-			return network_gossip::ValidationResult::ProcessAndKeep(topic);
+			return ValidationResult::ProcessAndKeep(topic);
 		}
-		network_gossip::ValidationResult::Discard
+		ValidationResult::Discard
 	}
 
 	fn message_allowed<'a>(
@@ -304,7 +306,7 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 	}
 
 	fn message_expired<'a>(&'a self) -> Box<dyn FnMut(Block::Hash, &[u8]) -> bool + 'a> {
-		Box::new(move |_topic, mut data| {
+		Box::new(move |topic, mut data| {
 			let inner = self.inner.read();
 			let is_complete = inner.is_local_complete();
 			let is_canceled = inner.is_local_canceled();
@@ -320,7 +322,7 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 
 			let gossip_msg = GossipMessage::decode(&mut data);
 			if let Ok(gossip_msg) = gossip_msg {
-				debug!("In `message_expired` of {:?}", inner.get_local_index());
+				println!("In `message_expired` of {:?}", inner.get_local_index());
 				// println!("msg: {:?}", gossip_msg);
 				let gmsg = gossip_msg.clone();
 				match gmsg {
@@ -343,7 +345,6 @@ impl<Block: BlockT> network_gossip::Validator<Block> for GossipValidator<Block> 
 						KeyGenMessage::Proof(from, _) => {
 							println!("proof from {:?}", from);
 						}
-						// _ => {}
 					},
 					_ => {}
 				}

@@ -20,8 +20,8 @@ use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 use sc_cli::{IntoExit, NoCustom, SharedParams, ImportParams, error};
 use sc_service::{AbstractService, Roles as ServiceRoles, Configuration};
 use log::info;
-use structopt::{StructOpt, clap::App};
-use sc_cli::{display_role, parse_and_prepare, AugmentClap, GetLogFilter, ParseAndPrepare};
+use structopt::{StructOpt, StructOptInternal, clap::App};
+use sc_cli::{display_role, parse_and_prepare, GetLogFilter, ParseAndPrepare};
 use crate::{service, ChainSpec, load_spec};
 use crate::factory_impl::FactoryState;
 use node_transaction_factory::RuntimeAdapter;
@@ -86,11 +86,11 @@ pub struct FactoryCmd {
 	pub import_params: ImportParams,
 }
 
-impl AugmentClap for FactoryCmd {
-	fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
-		FactoryCmd::augment_clap(app)
-	}
-}
+// impl StructOptInternal for FactoryCmd {
+// 	fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
+// 		FactoryCmd::augment_clap(app)
+// 	}
+// }
 
 /// Parse command line arguments into service configuration.
 pub fn run<I, T, E>(args: I, exit: E, version: sc_cli::VersionInfo) -> error::Result<()> where

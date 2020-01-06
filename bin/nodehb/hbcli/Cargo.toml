@@ -41,7 +41,7 @@ substrate-rpc = { package = "sc-rpc", path = "../../../client/rpc" }
 substrate-basic-authorship = {package="sc-basic-authority", path = "../../../client/basic-authorship" }
 sc-service = { path = "../../../client/service" }
 substrate-telemetry = { package = "sc-telemetry", path = "../../../client/telemetry" }
-keygen = { package="substrate-keygen", path = "../../../client/keygen" }
+keygen = { package="sc-mpc", path = "../../../client/mpc" }
 client-api = { package = "sc-client-api", path = "../../../client/api" }
 
 

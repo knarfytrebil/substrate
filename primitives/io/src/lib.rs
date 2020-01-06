@@ -34,30 +34,30 @@ use sp_std::vec::Vec;
 use sp_std::ops::Deref;
 
 #[cfg(feature = "std")]
-use primitives::{
+use sp_core::{
 	crypto::Pair,
 	traits::KeystoreExt,
 	offchain::{OffchainExt, TransactionPoolExt},
 	hexdisplay::HexDisplay,
-	storage::ChildStorageKey,
+	storage::{ChildStorageKey, ChildInfo},
 };
 
-use primitives::{
-	crypto::KeyTypeId, ed25519, sr25519,hbbft_thresh,H256,LogLevel,
+use sp_core::{
+	crypto::KeyTypeId, ed25519, sr25519, H256, LogLevel,hbbft_thresh,
 	offchain::{
 		Timestamp, HttpRequestId, HttpRequestStatus, HttpError, StorageKind, OpaqueNetworkState,
 	},
 };
 
 #[cfg(feature = "std")]
-use ::trie::{TrieConfiguration, trie_types::Layout};
+use ::sp_trie::{TrieConfiguration, trie_types::Layout};
 
-use runtime_interface::{runtime_interface, Pointer};
+use sp_runtime_interface::{runtime_interface, Pointer};
 
 use codec::{Encode, Decode};
 
 #[cfg(feature = "std")]
-use externalities::{ExternalitiesExt, Externalities};
+use sp_externalities::{ExternalitiesExt, Externalities};
 
 /// Error verifying ECDSA signature
 #[derive(Encode, Decode)]
@@ -91,10 +91,28 @@ pub trait Storage {
 		self.storage(key).map(|s| s.to_vec())
 	}
 
-	/// Returns the data for `key` in the child storage or `None` if the key can not be found.
-	fn child_get(&self, child_storage_key: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+	/// All Child api uses :
+	/// - A `child_storage_key` to define the anchor point for the child proof
+	/// (commonly the location where the child root is stored in its parent trie).
+	/// - A `child_storage_types` to identify the kind of the child type and how its
+	/// `child definition` parameter is encoded.
+	/// - A `child_definition_parameter` which is the additional information required
+	/// to use the child trie. For instance defaults child tries requires this to
+	/// contain a collision free unique id.
+	///
+	/// This function specifically returns the data for `key` in the child storage or `None`
+	/// if the key can not be found.
+	fn child_get(
+		&self,
+		child_storage_key: &[u8],
+		child_definition: &[u8],
+		child_type: u32,
+		key: &[u8],
+	) -> Option<Vec<u8>> {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
-		self.child_storage(storage_key, key).map(|s| s.to_vec())
+		let child_info = ChildInfo::resolve_child_info(child_type, child_definition)
+			.expect("Invalid child definition");
+		self.child_storage(storage_key, child_info, key).map(|s| s.to_vec())
 	}
 
 	/// Get `key` from storage, placing the value into `value_out` and return the number of
@@ -117,15 +135,21 @@ pub trait Storage {
 	/// doesn't exist at all.
 	/// If `value_out` length is smaller than the returned length, only `value_out` length bytes
 	/// are copied into `value_out`.
+	///
+	/// See `child_get` for common child api parameters.
 	fn child_read(
 		&self,
 		child_storage_key: &[u8],
+		child_definition: &[u8],
+		child_type: u32,
 		key: &[u8],
 		value_out: &mut [u8],
 		value_offset: u32,
 	) -> Option<u32> {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
-		self.child_storage(storage_key, key)
+		let child_info = ChildInfo::resolve_child_info(child_type, child_definition)
+			.expect("Invalid child definition");
+		self.child_storage(storage_key, child_info, key)
 			.map(|value| {
 				let value_offset = value_offset as usize;
 				let data = &value[value_offset.min(value.len())..];
@@ -141,9 +165,20 @@ pub trait Storage {
 	}
 
 	/// Set `key` to `value` in the child storage denoted by `child_storage_key`.
-	fn child_set(&mut self, child_storage_key: &[u8], key: &[u8], value: &[u8]) {
+	///
+	/// See `child_get` for common child api parameters.
+	fn child_set(
+		&mut self,
+		child_storage_key: &[u8],
+		child_definition: &[u8],
+		child_type: u32,
+		key: &[u8],
+		value: &[u8],
+	) {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
-		self.set_child_storage(storage_key, key.to_vec(), value.to_vec());
+		let child_info = ChildInfo::resolve_child_info(child_type, child_definition)
+			.expect("Invalid child definition");
+		self.set_child_storage(storage_key, child_info, key.to_vec(), value.to_vec());
 	}
 
 	/// Clear the storage of the given `key` and its value.
@@ -152,15 +187,34 @@ pub trait Storage {
 	}
 
 	/// Clear the given child storage of the given `key` and its value.
-	fn child_clear(&mut self, child_storage_key: &[u8], key: &[u8]) {
+	///
+	/// See `child_get` for common child api parameters.
+	fn child_clear(
+		&mut self,
+		child_storage_key: &[u8],
+		child_definition: &[u8],
+		child_type: u32,
+		key: &[u8],
+	) {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
-		self.clear_child_storage(storage_key, key);
+		let child_info = ChildInfo::resolve_child_info(child_type, child_definition)
+			.expect("Invalid child definition");
+		self.clear_child_storage(storage_key, child_info, key);
 	}
 
 	/// Clear an entire child storage.
-	fn child_storage_kill(&mut self, child_storage_key: &[u8]) {
+	///
+	/// See `child_get` for common child api parameters.
+	fn child_storage_kill(
+		&mut self,
+		child_storage_key: &[u8],
+		child_definition: &[u8],
+		child_type: u32,
+	) {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
-		self.kill_child_storage(storage_key);
+		let child_info = ChildInfo::resolve_child_info(child_type, child_definition)
+			.expect("Invalid child definition");
+		self.kill_child_storage(storage_key, child_info);
 	}
 
 	/// Check whether the given `key` exists in storage.
@@ -169,9 +223,19 @@ pub trait Storage {
 	}
 
 	/// Check whether the given `key` exists in storage.
-	fn child_exists(&self, child_storage_key: &[u8], key: &[u8]) -> bool {
+	///
+	/// See `child_get` for common child api parameters.
+	fn child_exists(
+		&self,
+		child_storage_key: &[u8],
+		child_definition: &[u8],
+		child_type: u32,
+		key: &[u8],
+	) -> bool {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
-		self.exists_child_storage(storage_key, key)
+		let child_info = ChildInfo::resolve_child_info(child_type, child_definition)
+			.expect("Invalid child definition");
+		self.exists_child_storage(storage_key, child_info, key)
 	}
 
 	/// Clear the storage of each key-value pair where the key starts with the given `prefix`.
@@ -180,9 +244,19 @@ pub trait Storage {
 	}
 
 	/// Clear the child storage of each key-value pair where the key starts with the given `prefix`.
-	fn child_clear_prefix(&mut self, child_storage_key: &[u8], prefix: &[u8]) {
+	///
+	/// See `child_get` for common child api parameters.
+	fn child_clear_prefix(
+		&mut self,
+		child_storage_key: &[u8],
+		child_definition: &[u8],
+		child_type: u32,
+		prefix: &[u8],
+	) {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
-		self.clear_child_prefix(storage_key, prefix);
+		let child_info = ChildInfo::resolve_child_info(child_type, child_definition)
+			.expect("Invalid child definition");
+		self.clear_child_prefix(storage_key, child_info, prefix);
 	}
 
 	/// "Commit" all existing operations and compute the resulting storage root.
@@ -199,7 +273,12 @@ pub trait Storage {
 	/// The hashing algorithm is defined by the `Block`.
 	///
 	/// Returns the SCALE encoded hash.
-	fn child_root(&mut self, child_storage_key: &[u8]) -> Vec<u8> {
+	///
+	/// See `child_get` for common child api parameters.
+	fn child_root(
+		&mut self,
+		child_storage_key: &[u8],
+	) -> Vec<u8> {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
 		self.child_storage_root(storage_key)
 	}
@@ -220,9 +299,17 @@ pub trait Storage {
 	}
 
 	/// Get the next key in storage after the given one in lexicographic order in child storage.
-	fn child_next_key(&mut self, child_storage_key: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+	fn child_next_key(
+		&mut self,
+		child_storage_key: &[u8],
+		child_definition: &[u8],
+		child_type: u32,
+		key: &[u8],
+	) -> Option<Vec<u8>> {
 		let storage_key = child_storage_key_or_panic(child_storage_key);
-		self.next_child_storage_key(storage_key, key)
+		let child_info = ChildInfo::resolve_child_info(child_type, child_definition)
+			.expect("Invalid child definition");
+		self.next_child_storage_key(storage_key, child_info, key)
 	}
 }
 
@@ -231,12 +318,12 @@ pub trait Storage {
 pub trait Trie {
 	/// A trie root formed from the iterated items.
 	fn blake2_256_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> H256 {
-		Layout::<primitives::Blake2Hasher>::trie_root(input)
+		Layout::<sp_core::Blake2Hasher>::trie_root(input)
 	}
 
 	/// A trie root formed from the enumerated items.
 	fn blake2_256_ordered_root(input: Vec<Vec<u8>>) -> H256 {
-		Layout::<primitives::Blake2Hasher>::ordered_trie_root(input)
+		Layout::<sp_core::Blake2Hasher>::ordered_trie_root(input)
 	}
 }
 
@@ -245,7 +332,7 @@ pub trait Trie {
 pub trait Misc {
 	/// The current relay chain identifier.
 	fn chain_id(&self) -> u64 {
-		externalities::Externalities::chain_id(*self)
+		sp_externalities::Externalities::chain_id(*self)
 	}
 
 	/// Print a number.
@@ -361,12 +448,34 @@ pub trait Crypto {
 			.map(|k| k.sign(msg))
 	}
 
+
+
 	/// Verify an `sr25519` signature.
 	///
 	/// Returns `true` when the verification in successful.
 	fn sr25519_verify(sig: &sr25519::Signature, msg: &[u8], pubkey: &sr25519::Public) -> bool {
 		sr25519::Pair::verify(sig, msg, pubkey)
 	}
+
+	/// Verify and recover a SECP256k1 ECDSA signature.
+	/// - `sig` is passed in RSV format. V should be either 0/1 or 27/28.
+	/// Returns `Err` if the signature is bad, otherwise the 64-byte pubkey
+	/// (doesn't include the 0x04 prefix).
+	fn secp256k1_ecdsa_recover(
+		sig: &[u8; 65],
+		msg: &[u8; 32],
+	) -> Result<[u8; 64], EcdsaVerifyError> {
+		let rs = secp256k1::Signature::parse_slice(&sig[0..64])
+			.map_err(|_| EcdsaVerifyError::BadRS)?;
+		let v = secp256k1::RecoveryId::parse(if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8)
+			.map_err(|_| EcdsaVerifyError::BadV)?;
+		let pubkey = secp256k1::recover(&secp256k1::Message::parse(msg), &rs, &v)
+			.map_err(|_| EcdsaVerifyError::BadSignature)?;
+		let mut res = [0u8; 64];
+		res.copy_from_slice(&pubkey.serialize()[1..65]);
+		Ok(res)
+	}
+
 	fn hb_node_public_keys(&mut self,id: KeyTypeId) -> Vec<hbbft_thresh::Public> {
 		self.extension::<KeystoreExt>()
 			.expect("No `keystore` associated for the current context!")
@@ -408,24 +517,6 @@ pub trait Crypto {
 
 
 
-	/// Verify and recover a SECP256k1 ECDSA signature.
-	/// - `sig` is passed in RSV format. V should be either 0/1 or 27/28.
-	/// Returns `Err` if the signature is bad, otherwise the 64-byte pubkey
-	/// (doesn't include the 0x04 prefix).
-	fn secp256k1_ecdsa_recover(
-		sig: &[u8; 65],
-		msg: &[u8; 32],
-	) -> Result<[u8; 64], EcdsaVerifyError> {
-		let rs = secp256k1::Signature::parse_slice(&sig[0..64])
-			.map_err(|_| EcdsaVerifyError::BadRS)?;
-		let v = secp256k1::RecoveryId::parse(if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8)
-			.map_err(|_| EcdsaVerifyError::BadV)?;
-		let pubkey = secp256k1::recover(&secp256k1::Message::parse(msg), &rs, &v)
-			.map_err(|_| EcdsaVerifyError::BadSignature)?;
-		let mut res = [0u8; 64];
-		res.copy_from_slice(&pubkey.serialize()[1..65]);
-		Ok(res)
-	}
 
 	/// Verify and recover a SECP256k1 ECDSA signature.
 	/// - `sig` is passed in RSV format. V should be either 0/1 or 27/28.
@@ -449,37 +540,37 @@ pub trait Crypto {
 pub trait Hashing {
 	/// Conduct a 256-bit Keccak hash.
 	fn keccak_256(data: &[u8]) -> [u8; 32] {
-		primitives::hashing::keccak_256(data)
+		sp_core::hashing::keccak_256(data)
 	}
 
 	/// Conduct a 256-bit Sha2 hash.
 	fn sha2_256(data: &[u8]) -> [u8; 32] {
-		primitives::hashing::sha2_256(data)
+		sp_core::hashing::sha2_256(data)
 	}
 
 	/// Conduct a 128-bit Blake2 hash.
 	fn blake2_128(data: &[u8]) -> [u8; 16] {
-		primitives::hashing::blake2_128(data)
+		sp_core::hashing::blake2_128(data)
 	}
 
 	/// Conduct a 256-bit Blake2 hash.
 	fn blake2_256(data: &[u8]) -> [u8; 32] {
-		primitives::hashing::blake2_256(data)
+		sp_core::hashing::blake2_256(data)
 	}
 
 	/// Conduct four XX hashes to give a 256-bit result.
 	fn twox_256(data: &[u8]) -> [u8; 32] {
-		primitives::hashing::twox_256(data)
+		sp_core::hashing::twox_256(data)
 	}
 
 	/// Conduct two XX hashes to give a 128-bit result.
 	fn twox_128(data: &[u8]) -> [u8; 16] {
-		primitives::hashing::twox_128(data)
+		sp_core::hashing::twox_128(data)
 	}
 
 	/// Conduct two XX hashes to give a 64-bit result.
 	fn twox_64(data: &[u8]) -> [u8; 8] {
-		primitives::hashing::twox_64(data)
+		sp_core::hashing::twox_64(data)
 	}
 }
 
@@ -834,7 +925,7 @@ pub fn oom(_: core::alloc::Layout) -> ! {
 
 /// Type alias for Externalities implementation used in tests.
 #[cfg(feature = "std")]
-pub type TestExternalities = sp_state_machine::TestExternalities<primitives::Blake2Hasher, u64>;
+pub type TestExternalities = sp_state_machine::TestExternalities<sp_core::Blake2Hasher, u64>;
 
 /// The host functions Substrate provides for the Wasm runtime environment.
 ///
@@ -855,8 +946,9 @@ pub type SubstrateHostFunctions = (
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use primitives::map;
+	use sp_core::map;
 	use sp_state_machine::BasicExternalities;
+	use sp_core::storage::Storage;
 
 	#[test]
 	fn storage_works() {
@@ -869,7 +961,10 @@ mod tests {
 			storage::set(b"foo", &[1, 2, 3][..]);
 		});
 
-		t = BasicExternalities::new(map![b"foo".to_vec() => b"bar".to_vec()], map![]);
+		t = BasicExternalities::new(Storage {
+			top: map![b"foo".to_vec() => b"bar".to_vec()],
+			children: map![],
+		});
 
 		t.execute_with(|| {
 			assert_eq!(storage::get(b"hello"), None);
@@ -879,10 +974,10 @@ mod tests {
 
 	#[test]
 	fn read_storage_works() {
-		let mut t = BasicExternalities::new(
-			map![b":test".to_vec() => b"\x0b\0\0\0Hello world".to_vec()],
-			map![],
-		);
+		let mut t = BasicExternalities::new(Storage {
+			top: map![b":test".to_vec() => b"\x0b\0\0\0Hello world".to_vec()],
+			children: map![],
+		});
 
 		t.execute_with(|| {
 			let mut v = [0u8; 4];
@@ -896,15 +991,15 @@ mod tests {
 
 	#[test]
 	fn clear_prefix_works() {
-		let mut t = BasicExternalities::new(
-			map![
+		let mut t = BasicExternalities::new(Storage {
+			top: map![
 				b":a".to_vec() => b"\x0b\0\0\0Hello world".to_vec(),
 				b":abcd".to_vec() => b"\x0b\0\0\0Hello world".to_vec(),
 				b":abc".to_vec() => b"\x0b\0\0\0Hello world".to_vec(),
 				b":abdd".to_vec() => b"\x0b\0\0\0Hello world".to_vec()
 			],
-			map![],
-		);
+			children: map![],
+		});
 
 		t.execute_with(|| {
 			storage::clear_prefix(b":abc");
