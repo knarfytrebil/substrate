@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -113,7 +113,7 @@ impl Store {
 	/// Insert a new key with anonymous crypto.
 	///
 	/// Places it into the file system store.
-	fn insert_unknown(&self, key_type: KeyTypeId, suri: &str, public: &[u8]) -> Result<()> {
+	pub fn insert_unknown(&self, key_type: KeyTypeId, suri: &str, public: &[u8]) -> Result<()> {
 		let mut file = File::create(self.key_file_path(public, key_type)).map_err(Error::Io)?;
 		serde_json::to_writer(&file, &suri).map_err(Error::Json)?;
 		file.flush().map_err(Error::Io)?;

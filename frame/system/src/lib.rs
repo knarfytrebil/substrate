@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -159,7 +159,9 @@ pub fn extrinsics_data_root<H: Hash>(xts: Vec<Vec<u8>>) -> H::Output {
 pub trait Trait: 'static + Eq + Clone {
 	/// The aggregated `Origin` type used by dispatchable calls.
 	type Origin:
-		Into<Result<RawOrigin<Self::AccountId>, Self::Origin>> + From<RawOrigin<Self::AccountId>>;
+		Into<Result<RawOrigin<Self::AccountId>, Self::Origin>>
+		+ From<RawOrigin<Self::AccountId>>
+		+ Clone;
 
 	/// The aggregated `Call` type.
 	type Call: Debug;

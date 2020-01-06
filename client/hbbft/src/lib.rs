@@ -648,8 +648,7 @@ where
 	RA: Send + Sync,
 	SC: SelectChain<Block>,
 {
-	let chain_info = client.info();
-	let _genesis_hash = chain_info.chain.genesis_hash;
+	let chain_info = client.chain_info();
 
 	let persistent_data = aux_store::loads_auth_set(
 		&*client,

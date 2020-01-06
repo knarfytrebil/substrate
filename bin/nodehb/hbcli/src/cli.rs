@@ -21,7 +21,7 @@ pub use sc_cli::{VersionInfo, IntoExit, NoCustom, SharedParams, };
 use sc_service::{AbstractService, Roles as ServiceRoles, Configuration};
 use log::info;
 use structopt::{StructOpt, StructOptInternal, clap::App};
-use sc_cli::{display_role, parse_and_prepare, GetLogFilter, ParseAndPrepare};
+use sc_cli::{display_role, parse_and_prepare, ParseAndPrepare};
 use crate::{service, ChainSpec, load_spec};
 use crate::factory_impl::FactoryState;
 use transaction_factory::RuntimeAdapter;
@@ -41,13 +41,6 @@ pub enum CustomSubcommands {
 	)]
 	Factory(FactoryCmd),
 }
-
-impl GetLogFilter for CustomSubcommands {
-	fn get_log_filter(&self) -> Option<String> {
-		None
-	}
-}
- 
    
 /// The `factory` command used to generate transactions.
 /// Please note: this command currently only works on an empty database!

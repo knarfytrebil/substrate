@@ -59,7 +59,11 @@ pub use self::state_machine::{ MessageIntent};
 pub use self::state_machine::{Validator, ValidatorContext, ValidationResult};
 pub use self::state_machine::DiscardAll;
 
-use sc_network::{specialization::NetworkSpecialization, Event, ExHashT, NetworkService, PeerId, ReputationChange};
+use sc_network::{
+    specialization::NetworkSpecialization, 
+    NetworkStateInfo,
+    Event, ExHashT, NetworkService, PeerId, ReputationChange
+};
 use sp_runtime::{traits::Block as BlockT, ConsensusEngineId};
 use std::sync::Arc;
 

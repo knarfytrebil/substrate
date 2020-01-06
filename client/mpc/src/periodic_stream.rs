@@ -10,8 +10,8 @@ use std::{
 use codec::{Decode, Encode};
 
 use futures::future::FutureExt;
-use futures::prelude::{Stream, TryStream};
-use futures::stream::{FilterMap, Fuse, StreamExt, TryStreamExt};
+use futures::prelude::Stream;
+use futures::stream::{Fuse, StreamExt};
 use futures::task::{Context, Poll};
 use futures_timer::Delay;
 

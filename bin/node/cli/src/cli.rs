@@ -1,4 +1,4 @@
-// Copyright 2018-2019 Parity Technologies (UK) Ltd.
+// Copyright 2018-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -20,8 +20,8 @@ use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 use sc_cli::{IntoExit, NoCustom, SharedParams, ImportParams, error};
 use sc_service::{AbstractService, Roles as ServiceRoles, Configuration};
 use log::info;
-use structopt::{StructOpt, StructOptInternal, clap::App};
-use sc_cli::{display_role, parse_and_prepare, GetLogFilter, ParseAndPrepare};
+use structopt::StructOpt;
+use sc_cli::{display_role, parse_and_prepare, GetSharedParams, ParseAndPrepare};
 use crate::{service, ChainSpec, load_spec};
 use crate::factory_impl::FactoryState;
 use node_transaction_factory::RuntimeAdapter;
@@ -38,9 +38,11 @@ pub enum CustomSubcommands {
 	Factory(FactoryCmd),
 }
 
-impl GetLogFilter for CustomSubcommands {
-	fn get_log_filter(&self) -> Option<String> {
-		None
+impl GetSharedParams for CustomSubcommands {
+	fn shared_params(&self) -> Option<&SharedParams> {
+		match self {
+			CustomSubcommands::Factory(cmd) => Some(&cmd.shared_params),
+		}
 	}
 }
 
@@ -85,12 +87,6 @@ pub struct FactoryCmd {
 	#[structopt(flatten)]
 	pub import_params: ImportParams,
 }
-
-// impl StructOptInternal for FactoryCmd {
-// 	fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
-// 		FactoryCmd::augment_clap(app)
-// 	}
-// }
 
 /// Parse command line arguments into service configuration.
 pub fn run<I, T, E>(args: I, exit: E, version: sc_cli::VersionInfo) -> error::Result<()> where

@@ -1,31 +1,34 @@
 use std::{
-	collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, pin::Pin, sync::Arc,
-	thread, time::Duration,
+	collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, thread, time::Duration,
 };
 
-use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::{FE, GE};
+use curv::{
+	cryptographic_primitives::{proofs::sigma_dlog::DLogProof, secret_sharing::feldman_vss::VerifiableSS},
+	elliptic::curves::traits::ECPoint,
+	FE, GE,
+};
 use futures::{
-	future::{select, FutureExt, TryFutureExt},
+	channel::mpsc,
+	future::{ready, select, FutureExt, TryFutureExt},
 	prelude::{Future, Sink, Stream},
 	stream::StreamExt,
 	task::{Context, Poll, Spawn},
 };
 use log::{debug, error, info};
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2018::party_i::{
-	KeyGenBroadcastMessage1 as KeyGenCommit, KeyGenDecommitMessage1 as KeyGenDecommit, Keys,
-	Parameters, PartyPrivate, SharedKeys, SignKeys,
+	KeyGenBroadcastMessage1 as KeyGenCommit, KeyGenDecommitMessage1 as KeyGenDecommit, Keys, Parameters, PartyPrivate,
+	SharedKeys, SignKeys,
 };
 use parking_lot::RwLock;
 
 use sc_client::Client;
 use sc_client_api::{backend::Backend, BlockchainEvents, CallExecutor, ExecutionStrategy};
 use sc_keystore::KeyStorePtr;
-use sc_network::{PeerId, NetworkService, NetworkStateInfo};
+use sc_network::{NetworkService, NetworkStateInfo, PeerId};
 use sc_network_gossip::{GossipEngine, Network as GossipNetwork, TopicNotification};
 use sp_blockchain::{Error as ClientError, HeaderBackend, Result as ClientResult};
 use sp_core::{
+	ecdsa::Pair,
 	offchain::{OffchainStorage, StorageKind},
 	Blake2Hasher, H256,
 };
@@ -33,7 +36,7 @@ use sp_offchain::STORAGE_PREFIX;
 use sp_runtime::generic::OpaqueDigestItemId;
 use sp_runtime::traits::{Block as BlockT, Header};
 
-use sp_mpc::{ConsensusLog, RequestId, MPC_ENGINE_ID};
+use sp_mpc::{get_storage_key, ConsensusLog, MpcRequest, OffchainStorageType, RequestId, MPC_ENGINE_ID};
 
 mod communication;
 mod periodic_stream;
@@ -41,7 +44,7 @@ mod signer;
 
 use communication::{
 	gossip::{GossipMessage, MessageWithSender},
-	message::{ConfirmPeersMessage, KeyGenMessage, PeerIndex, SignMessage},
+	message::{ConfirmPeersMessage, KeyGenMessage, PeerIndex, SigGenMessage},
 	NetworkBridge,
 };
 use periodic_stream::PeriodicStream;
@@ -51,7 +54,8 @@ pub trait Network<B: BlockT>: GossipNetwork<B> + Clone + Send + 'static {
 	fn local_peer_id(&self) -> PeerId;
 }
 
-impl<B, S, H> Network<B> for Arc<NetworkService<B, S, H>> where
+impl<B, S, H> Network<B> for Arc<NetworkService<B, S, H>>
+where
 	B: BlockT,
 	S: sc_network::specialization::NetworkSpecialization<B>,
 	H: sc_network::ExHashT,
@@ -74,7 +78,6 @@ pub struct NodeConfig {
 	pub duration: u64,
 	pub threshold: u16,
 	pub players: u16,
-	pub keystore: Option<KeyStorePtr>,
 }
 
 impl NodeConfig {
@@ -123,6 +126,9 @@ impl Default for KeyGenState {
 	}
 }
 
+#[derive(Debug)]
+pub struct SigGenState {}
+
 pub(crate) struct Environment<B, E, Block: BlockT, RA, Storage> {
 	pub client: Arc<Client<B, E, Block, RA>>,
 	pub config: NodeConfig,
@@ -131,15 +137,10 @@ pub(crate) struct Environment<B, E, Block: BlockT, RA, Storage> {
 	pub offchain: Arc<RwLock<Storage>>,
 }
 
-#[derive(Debug)]
-pub enum MpcArgument {
-	KeyGen(RequestId),
-	SigGen(RequestId, Vec<u8>),
-}
-
 struct KeyGenWork<B, E, Block: BlockT, RA, Storage> {
 	key_gen: Pin<Box<dyn Future<Output = Result<(), Error>> + Send + Unpin>>,
 	env: Arc<Environment<B, E, Block, RA, Storage>>,
+	mpc_arg_rx: mpsc::UnboundedReceiver<MpcRequest>,
 }
 
 impl<B, E, Block, RA, Storage> KeyGenWork<B, E, Block, RA, Storage>
@@ -155,7 +156,8 @@ where
 		client: Arc<Client<B, E, Block, RA>>,
 		config: NodeConfig,
 		bridge: NetworkBridge<Block>,
-		db: Storage,
+		offchain: Storage,
+		mpc_arg_rx: mpsc::UnboundedReceiver<MpcRequest>,
 	) -> Self {
 		let state = KeyGenState::default();
 
@@ -164,22 +166,33 @@ where
 			config,
 			bridge,
 			state: Arc::new(RwLock::new(state)),
-			offchain: Arc::new(RwLock::new(db)),
+			offchain: Arc::new(RwLock::new(offchain)),
 		});
 
 		let mut work = Self {
 			key_gen: Box::pin(futures::future::pending()),
 			env,
+			mpc_arg_rx,
 		};
-		work.rebuild(true); // init should be okay
+		work.rebuild(true);
 		work
 	}
 
 	fn rebuild(&mut self, last_message_ok: bool) {
+		// last_message_ok = true when the first build, = false else
 		let (incoming, outgoing) = global_comm(&self.env.bridge, self.env.config.duration);
 		let signer = Signer::new(self.env.clone(), incoming, outgoing, last_message_ok);
 
 		self.key_gen = Box::pin(signer);
+	}
+
+	fn handle_command(&mut self, command: MpcRequest) {
+		match command {
+			MpcRequest::KeyGen(id) => {
+				self.env.bridge.start_key_gen(id);
+			}
+			_ => {}
+		}
 	}
 }
 
@@ -195,12 +208,33 @@ where
 	type Output = Result<(), Error>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-		println!("POLLLLLLLLLLLLLLLLLLLL");
+		println!("POLLING IN KEYGEN WORK");
+
+		match self.mpc_arg_rx.poll_next_unpin(cx) {
+			Poll::Pending => {}
+			Poll::Ready(None) => {
+				// impossible
+				return Poll::Ready(Ok(()));
+			}
+			Poll::Ready(Some(command)) => {
+				self.handle_command(command);
+				futures01::task::current().notify();
+			}
+		}
+
 		match self.key_gen.poll_unpin(cx) {
 			Poll::Pending => {
-				let (is_complete, is_canceled, commits_len) = {
+				{
 					let state = self.env.state.read();
 					let validator = self.env.bridge.validator.inner.read();
+
+					if state.complete {
+						let mut offchain_storage = self.env.offchain.write();
+
+						let lk = state.local_key.clone().unwrap();
+						let seed = bincode::serialize(&lk).unwrap();
+						offchain_storage.set(STORAGE_PREFIX, b"local_key", &seed);
+					}
 
 					println!(
 						"INDEX {:?} state: commits {:?} decommits {:?} vss {:?} ss {:?}  proof {:?} has key {:?} complete {:?} peers hash {:?}",
@@ -214,11 +248,6 @@ where
 						state.complete,
 						validator.get_peers_hash()
 					);
-					(
-						validator.is_local_complete(),
-						validator.is_local_canceled(),
-						state.commits.len(),
-					)
 				};
 
 				return Poll::Pending;
@@ -229,7 +258,6 @@ where
 			Poll::Ready(Err(e)) => {
 				match e {
 					Error::Rebuild => {
-						println!("inner keygen rebuilt");
 						self.rebuild(false);
 						futures01::task::current().notify();
 						return Poll::Pending;
@@ -258,12 +286,11 @@ where
 	(global_in, global_out)
 }
 
-pub fn run_task<B, E, Block, N, RA, Ex>(
+pub fn run_mpc_task<B, E, Block, N, RA, Ex>(
 	client: Arc<Client<B, E, Block, RA>>,
 	backend: Arc<B>,
 	network: N,
-	keystore: KeyStorePtr,
-	executor: Ex
+	executor: Ex,
 ) -> ClientResult<impl futures01::Future<Item = (), Error = ()>>
 where
 	B: Backend<Block, Blake2Hasher> + 'static,
@@ -274,61 +301,58 @@ where
 	RA: Send + Sync + 'static,
 	Ex: Spawn + 'static,
 {
-	let keyclone = keystore.clone();
 	let config = NodeConfig {
 		duration: 1,
 		threshold: 1,
 		players: 3,
-		keystore: Some(keystore),
 	};
-	let backend_ = backend.clone();
-	let streamer = client
-		.clone()
-		.import_notification_stream()
-		.for_each(move |n| {
-			let logs = n.header.digest().logs().iter();
-
-			let arg = logs
-				.filter_map(|l| {
-					l.try_to::<ConsensusLog>(OpaqueDigestItemId::Consensus(&MPC_ENGINE_ID))
-				})
-				.find_map(|l| match l {
-					ConsensusLog::RequestForSig(id, data) => Some(MpcArgument::SigGen(id, data)),
-					ConsensusLog::RequestForKey(id) => Some(MpcArgument::KeyGen(id)),
-				});
-
-			if let Some(arg) = arg {
-				match arg {
-					MpcArgument::SigGen(id, mut data) => {
-						if let Some(mut offchain_storage) = backend.offchain_storage() {
-							let key = id.to_le_bytes();
-							info!("key {:?} data {:?}", key, data);
-							let mut t = vec![1u8];
-							t.append(&mut data);
-							offchain_storage.set(STORAGE_PREFIX, &key, &t);
-						}
-					}
-					MpcArgument::KeyGen(id) => {}
-				}
-			}
-
-			futures::future::ready(())
-		});
 
 	let local_peer_id = network.local_peer_id();
 	let bridge = NetworkBridge::new(network, config.clone(), local_peer_id, &executor);
+	let offchain_storage = backend.offchain_storage().expect("need offchain storage");
 
-	let keygen_work = KeyGenWork::new(
-		client,
-		config,
-		bridge,
-		backend_
-			.offchain_storage()
-			.expect("Need offchain for keygen work"),
-	)
-	.map_err(|e| error!("Error {:?}", e));
+	let (tx, rx) = mpsc::unbounded();
 
-	let worker = select(streamer, keygen_work).then(|_| futures::future::ready(Ok(())));
+	let streamer = client.clone().import_notification_stream().for_each(move |n| {
+		let logs = n.header.digest().logs().iter();
+		if n.header.number() == &5.into() {
+			// temp workaround since cannot use polkadot js now
+			let _ = tx.unbounded_send(MpcRequest::KeyGen(1));
+		}
+
+		let arg = logs
+			.filter_map(|l| l.try_to::<ConsensusLog>(OpaqueDigestItemId::Consensus(&MPC_ENGINE_ID)))
+			.find_map(|l| match l {
+				ConsensusLog::RequestForSig(req_id, pk_id, data) => Some(MpcRequest::SigGen(req_id, pk_id, data)),
+				ConsensusLog::RequestForKey(id) => Some(MpcRequest::KeyGen(id)),
+			});
+
+		if let Some(arg) = arg {
+			match arg {
+				MpcRequest::SigGen(req_id, pk_id, mut data) => {
+					let req = MpcRequest::SigGen(req_id, pk_id, data.clone());
+					let _ = tx.unbounded_send(req);
+					if let Some(mut offchain_storage) = backend.offchain_storage() {
+						let key = get_storage_key(req_id, OffchainStorageType::Signature);
+						info!("key {:?} data {:?}", key, data);
+						let mut t = vec![1u8];
+						t.append(&mut data);
+						offchain_storage.set(STORAGE_PREFIX, &key, &t);
+					}
+				}
+				kg @ MpcRequest::KeyGen(_) => {
+					let _ = tx.unbounded_send(kg);
+				}
+			}
+		}
+
+		ready(())
+	});
+
+	let keygen_work =
+		KeyGenWork::new(client, config, bridge, offchain_storage, rx).map_err(|e| error!("Error {:?}", e));
+
+	let worker = select(streamer, keygen_work).then(|_| ready(Ok(())));
 
 	Ok(worker.compat())
 }

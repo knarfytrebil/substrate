@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2017-2020 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -35,8 +35,8 @@ use futures03::{
 };
 use sc_keystore::{Store as Keystore};
 use log::{info, warn, error};
-use sc_network::{FinalityProofProvider, OnDemand, NetworkService, NetworkStateInfo, DhtEvent};
-use sc_network::{config::BoxFinalityProofRequestBuilder, specialization::NetworkSpecialization};
+use sc_network::{FinalityProofProvider, OnDemand, NetworkService, NetworkStateInfo};
+use sc_network::{config::BoxFinalityProofRequestBuilder, specialization::NetworkSpecialization, specialization::DhtEvent};
 use parking_lot::{Mutex, RwLock};
 use sp_core::{Blake2Hasher, H256, Hasher};
 use sc_rpc;
@@ -90,12 +90,11 @@ pub struct ServiceBuilder<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImp
 	transaction_pool: Arc<TExPool>,
 	rpc_extensions: TRpc,
 	remote_backend: Option<Arc<dyn RemoteBlockchain<TBl>>>,
-	dht_event_tx: Option<mpsc::Sender<DhtEvent>>,
 	marker: PhantomData<(TBl, TRtApi)>,
 }
 
 /// Full client type.
-type TFullClient<TBl, TRtApi, TExecDisp> = Client<
+pub type TFullClient<TBl, TRtApi, TExecDisp> = Client<
 	TFullBackend<TBl>,
 	TFullCallExecutor<TBl, TExecDisp>,
 	TBl,
@@ -103,16 +102,16 @@ type TFullClient<TBl, TRtApi, TExecDisp> = Client<
 >;
 
 /// Full client backend type.
-type TFullBackend<TBl> = sc_client_db::Backend<TBl>;
+pub type TFullBackend<TBl> = sc_client_db::Backend<TBl>;
 
 /// Full client call executor type.
-type TFullCallExecutor<TBl, TExecDisp> = sc_client::LocalCallExecutor<
+pub type TFullCallExecutor<TBl, TExecDisp> = sc_client::LocalCallExecutor<
 	sc_client_db::Backend<TBl>,
 	NativeExecutor<TExecDisp>,
 >;
 
 /// Light client type.
-type TLightClient<TBl, TRtApi, TExecDisp> = Client<
+pub type TLightClient<TBl, TRtApi, TExecDisp> = Client<
 	TLightBackend<TBl>,
 	TLightCallExecutor<TBl, TExecDisp>,
 	TBl,
@@ -120,13 +119,13 @@ type TLightClient<TBl, TRtApi, TExecDisp> = Client<
 >;
 
 /// Light client backend type.
-type TLightBackend<TBl> = sc_client::light::backend::Backend<
+pub type TLightBackend<TBl> = sc_client::light::backend::Backend<
 	sc_client_db::light::LightStorage<TBl>,
 	Blake2Hasher,
 >;
 
 /// Light call executor type.
-type TLightCallExecutor<TBl, TExecDisp> = sc_client::light::call_executor::GenesisCallExecutor<
+pub type TLightCallExecutor<TBl, TExecDisp> = sc_client::light::call_executor::GenesisCallExecutor<
 	sc_client::light::backend::Backend<
 		sc_client_db::light::LightStorage<TBl>,
 		Blake2Hasher
@@ -225,7 +224,6 @@ where TGen: RuntimeGenesis, TCSExt: Extension {
 			transaction_pool: Arc::new(()),
 			rpc_extensions: Default::default(),
 			remote_backend: None,
-			dht_event_tx: None,
 			marker: PhantomData,
 		})
 	}
@@ -303,7 +301,6 @@ where TGen: RuntimeGenesis, TCSExt: Extension {
 			transaction_pool: Arc::new(()),
 			rpc_extensions: Default::default(),
 			remote_backend: Some(remote_blockchain),
-			dht_event_tx: None,
 			marker: PhantomData,
 		})
 	}
@@ -352,7 +349,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: self.transaction_pool,
 			rpc_extensions: self.rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: self.dht_event_tx,
 			marker: self.marker,
 		})
 	}
@@ -395,7 +391,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: self.transaction_pool,
 			rpc_extensions: self.rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: self.dht_event_tx,
 			marker: self.marker,
 		})
 	}
@@ -430,7 +425,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 				transaction_pool: self.transaction_pool,
 				rpc_extensions: self.rpc_extensions,
 				remote_backend: self.remote_backend,
-				dht_event_tx: self.dht_event_tx,
 				marker: self.marker,
 			})
 		}
@@ -457,7 +451,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: self.transaction_pool,
 			rpc_extensions: self.rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: self.dht_event_tx,
 			marker: self.marker,
 		})
 	}
@@ -499,7 +492,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: self.transaction_pool,
 			rpc_extensions: self.rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: self.dht_event_tx,
 			marker: self.marker,
 		})
 	}
@@ -565,7 +557,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: self.transaction_pool,
 			rpc_extensions: self.rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: self.dht_event_tx,
 			marker: self.marker,
 		})
 	}
@@ -621,7 +612,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: Arc::new(transaction_pool),
 			rpc_extensions: self.rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: self.dht_event_tx,
 			marker: self.marker,
 		})
 	}
@@ -661,7 +651,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: self.transaction_pool,
 			rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: self.dht_event_tx,
 			marker: self.marker,
 		})
 	}
@@ -703,7 +692,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: self.transaction_pool,
 			rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: self.dht_event_tx,
 			marker: self.marker,
 		})
 	}
@@ -728,7 +716,6 @@ impl<TBl, TRtApi, TCfg, TGen, TCSExt, TCl, TFchr, TSc, TImpQu, TFprb, TFpp, TNet
 			transaction_pool: self.transaction_pool,
 			rpc_extensions: self.rpc_extensions,
 			remote_backend: self.remote_backend,
-			dht_event_tx: Some(dht_event_tx),
 			marker: self.marker,
 		})
 	}
@@ -837,12 +824,11 @@ ServiceBuilder<
 			transaction_pool,
 			rpc_extensions,
 			remote_backend,
-			dht_event_tx,
 		} = self;
 
 		sp_session::generate_initial_session_keys(
 			client.clone(),
-			&BlockId::Hash(client.info().chain.best_hash),
+			&BlockId::Hash(client.chain_info().best_hash),
 			config.dev_key_seed.clone().map(|s| vec![s]).unwrap_or_default(),
 		)?;
 		let (signal, exit) = exit_future::signal();
@@ -855,7 +841,7 @@ ServiceBuilder<
 		let (essential_failed_tx, essential_failed_rx) = mpsc::unbounded();
 
 		let import_queue = Box::new(import_queue);
-		let chain_info = client.info().chain;
+		let chain_info = client.chain_info();
 
 		let version = config.full_version();
 		info!("Highest known block at #{}", chain_info.best_number);
@@ -991,7 +977,7 @@ ServiceBuilder<
 		let (state_tx, state_rx) = mpsc::unbounded::<(NetworkStatus<_>, NetworkState)>();
 		network_status_sinks.lock().push(std::time::Duration::from_millis(5000), state_tx);
 		let tel_task = state_rx.for_each(move |(net_status, _)| {
-			let info = client_.info();
+			let info = client_.usage_info();
 			let best_number = info.chain.best_number.saturated_into::<u64>();
 			let best_hash = info.chain.best_hash;
 			let num_peers = net_status.num_connected_peers;
@@ -1126,7 +1112,6 @@ ServiceBuilder<
 			network_status_sinks.clone(),
 			system_rpc_rx,
 			has_bootnodes,
-			dht_event_tx,
 		)
 			.map_err(|_| ())
 			.select(exit.clone().map(Ok).compat())

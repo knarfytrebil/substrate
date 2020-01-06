@@ -12,9 +12,7 @@ use log::{error, info, trace};
 use sc_network::message::generic::{ConsensusMessage, Message};
 use sc_network::{NetworkService, PeerId};
 use sc_network_gossip::{GossipEngine, Network, TopicNotification};
-use sp_runtime::traits::{
-	Block as BlockT, DigestFor, Hash as HashT, Header as HeaderT, NumberFor, ProvideRuntimeApi,
-};
+use sp_runtime::traits::{Block as BlockT, DigestFor, Hash as HashT, Header as HeaderT, NumberFor, ProvideRuntimeApi};
 
 use sp_mpc::MPC_ENGINE_ID;
 
@@ -22,47 +20,13 @@ pub mod gossip;
 pub mod message;
 mod peer;
 
-use crate::{NodeConfig, Error};
+use crate::{Error, NodeConfig};
 
-use gossip::{GossipMessage, GossipValidator, MessageWithReceiver, MessageWithSender};
-use message::{ConfirmPeersMessage, KeyGenMessage, SignMessage};
+use gossip::{GossipMessage, GossipValidator, MessageWithReceiver, MessageWithSender, RequestId};
+use message::ConfirmPeersMessage;
 
-pub struct NetworkStream<R> {
-	inner: Option<R>,
-	outer: oneshot::Receiver<R>,
-}
-
-impl<R> Stream for NetworkStream<R>
-where
-	R: Stream<Item = TopicNotification> + Unpin,
-{
-	type Item = R::Item;
-
-	fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-		if let Some(ref mut inner) = self.as_mut().inner {
-			return inner.poll_next_unpin(cx);
-		}
-
-		match self.outer.poll_unpin(cx) {
-			Poll::Ready(r) => match r {
-				Ok(mut inner) => {
-					let poll_result = inner.poll_next_unpin(cx);
-					self.inner = Some(inner);
-					poll_result
-				}
-				Err(Canceled) => panic!("Oneshot cancelled"),
-			},
-			Poll::Pending => Poll::Pending,
-		}
-	}
-}
-
-pub(crate) fn hash_topic<B: BlockT>(hash: u64) -> B::Hash {
-	<<B::Header as HeaderT>::Hashing as HashT>::hash(&hash.to_be_bytes())
-}
-
-pub(crate) fn string_topic<B: BlockT>(input: &str) -> B::Hash {
-	<<B::Header as HeaderT>::Hashing as HashT>::hash(input.as_bytes())
+pub(crate) fn bytes_topic<B: BlockT>(input: &[u8]) -> B::Hash {
+	<<B::Header as HeaderT>::Hashing as HashT>::hash(input)
 }
 
 struct MessageSender<Block: BlockT> {
@@ -147,30 +111,39 @@ where
 		impl Stream<Item = MessageWithSender>,
 		impl Sink<MessageWithReceiver, Error = Error>,
 	) {
-		let topic = string_topic::<B>("hash"); // related with `fn validate` in gossip.rs
+		let topic = bytes_topic::<B>(b"hash"); // related with `fn validate` in gossip.rs
 
-		let incoming = self
-			.gossip_engine
-			.messages_for(topic)
-			.filter_map(|notification| {
-				async {
-					let decoded = GossipMessage::decode(&mut &notification.message[..]);
-					if let Err(e) = decoded {
-						trace!("notification error {:?}", e);
-						println!("NOTIFICATION ERROR");
-						return None;
-					}
-					println!("sender in global {:?}", notification.sender);
-					Some((decoded.unwrap(), notification.sender))
-				}
-			});
+		let incoming = self.gossip_engine.messages_for(topic).filter_map(|notification| async {
+			let decoded = GossipMessage::decode(&mut &notification.message[..]);
+			if let Err(e) = decoded {
+				trace!("notification error {:?}", e);
+				return None;
+			}
+			Some((decoded.unwrap(), notification.sender))
+		});
 
-		let outgoing = MessageSender::<B> {
+		let outgoing = MessageSender {
 			network: self.gossip_engine.clone(),
 			validator: self.validator.clone(),
 		};
 
 		(incoming.boxed(), outgoing)
+	}
+
+	pub fn start_key_gen(&self, _id: RequestId) {
+		let inner = self.validator.inner.read();
+
+		let all_peers_len = inner.get_peers_len();
+		let players = inner.get_players() as usize;
+		if all_peers_len != players {
+			return;
+		}
+
+		let our_index = inner.get_local_index() as u16;
+		let all_peers_hash = inner.get_peers_hash();
+		let msg = GossipMessage::ConfirmPeers(ConfirmPeersMessage::Confirming(our_index), all_peers_hash);
+		let peers = inner.get_other_peers();
+		self.gossip_engine.send_message(peers, msg.encode());
 	}
 }
 
@@ -183,5 +156,5 @@ impl<B: BlockT> Clone for NetworkBridge<B> {
 	}
 }
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
