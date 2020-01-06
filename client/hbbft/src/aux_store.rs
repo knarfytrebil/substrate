@@ -23,7 +23,6 @@ use parity_codec::{Encode, Decode};
 use sc_api::{Backend,AuxStore};
 use sp_blockchain::{Result as ClientResult, Error as ClientError};
 use runtime_primitives::{
-	generic::{OpaqueDigestItemId},
 	 Justification,
 };
 //use fork_tree::ForkTree;

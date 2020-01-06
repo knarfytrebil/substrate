@@ -1,13 +1,13 @@
-use std::{future, marker::Unpin, pin::Pin, sync::Arc};
+use std::{ pin::Pin, sync::Arc};//future, marker::Unpin,
 
 use codec::{Decode, Encode};
-use futures::channel::oneshot::{self, Canceled};
-use futures::compat::{Compat, Compat01As03};
-use futures::future::FutureExt;
-use futures::prelude::{Future, Sink, Stream, TryStream};
-use futures::stream::{FilterMap, StreamExt, TryStreamExt};
+//use futures::channel::oneshot::{self, Canceled};
+//use futures::compat::{Compat, Compat01As03};
+//use futures::future::FutureExt;
+use futures::prelude::{ Sink, Stream, };//Future,TryStream
+use futures::stream::{ StreamExt}; //FilterMap TryStreamExt
 use futures::task::{Context, Poll};
-use log::{error, info, trace};
+use log::{ trace};//error, info
 
 use sc_network::message::generic::{ConsensusMessage, Message};
 use sc_network::{NetworkService, PeerId};

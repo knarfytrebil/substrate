@@ -1460,6 +1460,7 @@ impl<'a, B, E, Block, RA> sp_consensus::BlockImport<Block> for &'a Client<B, E, 
 	) -> Result<ImportResult, Self::Error> {
 		info!("IMPORT_BLOCK called");
 		self.lock_import_and_run(|operation| {
+			info!("Applying block : just {:?} {:?}",&import_block.justification,&import_block.finalized);
 			self.apply_block(operation, import_block, new_cache)
 		}).map_err(|e| {
 			warn!("Block import error:\n{:?}", e);

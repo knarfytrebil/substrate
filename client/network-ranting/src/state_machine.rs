@@ -42,7 +42,7 @@ mod rep {
 	/// Reputation change when a peer sends us a gossip message that we didn't know about.
 	pub const GOSSIP_SUCCESS: Rep = Rep::new(1 << 4, "Successfull gossip");
 	/// Reputation change when a peer sends us a gossip message that we already knew about.
-	pub const DUPLICATE_GOSSIP: Rep = Rep::new(-(1 << 2), "Duplicate gossip");
+	//pub const DUPLICATE_GOSSIP: Rep = Rep::new(-(1 << 2), "Duplicate gossip");
 	pub const MALFORMED_GOSSIP: Rep = Rep::new(-(1 << 2), "Malformed gossip");
 	/// Reputation change when a peer sends us a gossip message for an unknown engine, whatever that
 	/// means.
@@ -403,7 +403,7 @@ impl<B: BlockT> ConsensusGossip<B> {
 		let message_hash = HashFor::<B>::hash(&message[..]);
 
 		let mut targets=Vec::new();
-		for (id, mut peer) in self.peers.iter_mut()
+		for (id,  peer) in self.peers.iter_mut()
 		{
 			if !except.contains(&id) &&  *id!=self.self_id
 		  {
@@ -466,7 +466,7 @@ impl<B: BlockT> ConsensusGossip<B> {
 		let message_hash = HashFor::<B>::hash(&message[..]);
 
 		let mut targets=Vec::new();
-		for (id, mut peer) in self.peers.iter_mut()
+		for (id,  peer) in self.peers.iter_mut()
 		{
 			if set.contains(&id) && *id!=self.self_id
 		  {
@@ -560,10 +560,10 @@ impl<B: BlockT> ConsensusGossip<B> {
 
 
 
-			let msgdata=match rmsg.route
+			let msgdata=match &rmsg.route
 			{
-            /// broadcast to all except
-			RoutingInfo::BroadcastExclude(excluded) =>
+            // broadcast to all except
+			RoutingInfo::BroadcastExclude(ref excluded) =>
 			{
 			 if excluded.iter().find(|x| x.0==self.self_id ).is_some()
 			 {
@@ -576,8 +576,8 @@ impl<B: BlockT> ConsensusGossip<B> {
                rmsg.msg
 			 }
 			}
-	        /// target a subset
-			RoutingInfo::Targeted(set) => 
+	        // target a subset
+			RoutingInfo::Targeted(ref set) => 
 			{
 				if set.iter().find(|x| x.0==self.self_id ).is_none()
 				{
@@ -589,7 +589,7 @@ impl<B: BlockT> ConsensusGossip<B> {
 				  rmsg.msg
 				}
 			},
-	        /// Specific to a local node
+	        // Specific to a local node
 	        RoutingInfo::Specific =>  { rmsg.msg},
 			};
 
@@ -618,7 +618,21 @@ impl<B: BlockT> ConsensusGossip<B> {
 					continue;
 				}
 			};
-
+			match rmsg.route
+			{
+ // broadcast to all except
+ RoutingInfo::BroadcastExclude(excluded) =>
+ {
+  	  self.broadcast_except(protocol,engine_id.clone(),excluded.iter().map(|x| x.0.clone()).collect(),msgdata.clone(), true,false);	
+ }
+ // target a subset
+ RoutingInfo::Targeted(set) => 
+ {
+		 self.send_to_set(protocol,engine_id.clone(),set.iter().map(|x| x.0.clone()).collect(),msgdata.clone(),true,false);   
+ },
+ // Specific to a local node
+ RoutingInfo::Specific =>  { },
+			}
 			if let Entry::Occupied(mut entry) = self.live_message_sinks.entry(engine_id) {
 				debug!(target: "gossip", "Pushing consensus message to sinks.");
 				entry.get_mut().retain(|sink| {
@@ -655,7 +669,7 @@ impl<B: BlockT> ConsensusGossip<B> {
 		engine_id:ConsensusEngineId,
 		message: RawMessage,
 	) {
-		let peer = match self.peers.get_mut(who) {
+		let _peer = match self.peers.get_mut(who) {
 			None => return,
 			Some(peer) => peer,
 		};

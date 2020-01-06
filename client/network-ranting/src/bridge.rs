@@ -16,7 +16,7 @@
 
 use crate::Network;
 use crate::state_machine::{ConsensusGossip, Validator, RawMessage,ValidatorContext};
-use std::collections::{HashMap, HashSet, hash_map::Entry};
+use std::collections::{ HashSet, }; //HashMap, hash_map::Entry
 
 use sc_network::Context;
 use sc_network::message::generic::ConsensusMessage;
@@ -77,12 +77,12 @@ impl<'g,  B: BlockT> ValidatorContext<B> for NetworkOvertext<'g,  B> {
 
 impl<B: BlockT> RantingEngine<B> {
 
-	pub fn with_lock<Fnt,C>(&self,F:Fnt) ->C
+	pub fn with_lock<Fnt,C>(&self,f_call:Fnt) ->C
 	where Fnt: FnOnce(&mut NetworkOvertext<B>) ->C
 	{
 		let mut lock=&mut self.inner.lock();
 		let mut context = NetworkOvertext { gossipa: &mut lock, engine_id: self.engine_id.clone() };
-        F(&mut context)
+        f_call(&mut context)
 	}
 
 	/// Create a new instance.
@@ -225,19 +225,19 @@ impl<B: BlockT> RantingEngine<B> {
 		let inner = &mut *inner;
 		inner.state_machine.broadcast_except(&mut *inner.context, self.engine_id,except , message, false,false)
 	}
-	fn send_to_set(&self,set:HashSet<PeerId>, message: Vec<u8>)
+	pub fn send_to_set(&self,set:HashSet<PeerId>, message: Vec<u8>)
 	{
 		let mut inner = self.inner.lock();
 		let inner = &mut *inner;
 		inner.state_machine.send_to_set(&mut *inner.context,self.engine_id, set, message, true,false,);
 	}
-	fn send_single(&self,who:PeerId, message: Vec<u8>)
+	pub fn send_single(&self,who:PeerId, message: Vec<u8>)
 	{
 		let mut inner = self.inner.lock();
 		let inner = &mut *inner;
 	   inner.state_machine.send_single(&mut *inner.context, self.engine_id,&who, message)
 	}
-	fn keep(&self,cell:B::Hash, message: Vec<u8>)
+	pub fn keep(&self,cell:B::Hash, message: Vec<u8>)
 	{
 		self.inner.lock().state_machine.register_message(cell, self.engine_id.clone(),message);
    }

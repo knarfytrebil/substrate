@@ -14,29 +14,29 @@ use futures::{
 	stream::StreamExt,
 	task::{Context, Poll, Spawn},
 };
-use log::{debug, error, info};
+use log::{ error, info};//debug
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2018::party_i::{
-	KeyGenBroadcastMessage1 as KeyGenCommit, KeyGenDecommitMessage1 as KeyGenDecommit, Keys, Parameters, PartyPrivate,
-	SharedKeys, SignKeys,
+	KeyGenBroadcastMessage1 as KeyGenCommit, KeyGenDecommitMessage1 as KeyGenDecommit, Keys, Parameters, //PartyPrivate, SignKeys
+	SharedKeys, 
 };
 use parking_lot::RwLock;
 
 use sc_client::Client;
 use sc_client_api::{backend::Backend, BlockchainEvents, CallExecutor, ExecutionStrategy};
-use sc_keystore::KeyStorePtr;
+//use sc_keystore::KeyStorePtr;
 use sc_network::{NetworkService, NetworkStateInfo, PeerId};
-use sc_network_gossip::{GossipEngine, Network as GossipNetwork, TopicNotification};
-use sp_blockchain::{Error as ClientError, HeaderBackend, Result as ClientResult};
+use sc_network_gossip::{ Network as GossipNetwork, TopicNotification}; //GossipEngine
+use sp_blockchain::{Error as ClientError,  Result as ClientResult}; //HeaderBackend
 use sp_core::{
-	ecdsa::Pair,
-	offchain::{OffchainStorage, StorageKind},
+//	ecdsa::Pair,StorageKind
+	offchain::{OffchainStorage, },
 	Blake2Hasher, H256,
 };
 use sp_offchain::STORAGE_PREFIX;
 use sp_runtime::generic::OpaqueDigestItemId;
 use sp_runtime::traits::{Block as BlockT, Header};
 
-use sp_mpc::{get_storage_key, ConsensusLog, MpcRequest, OffchainStorageType, RequestId, MPC_ENGINE_ID};
+use sp_mpc::{get_storage_key, ConsensusLog, MpcRequest, OffchainStorageType,  MPC_ENGINE_ID}; //RequestId
 
 mod communication;
 mod periodic_stream;

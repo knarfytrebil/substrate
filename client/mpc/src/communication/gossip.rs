@@ -1,15 +1,15 @@
 use std::{
-	collections::VecDeque,
+	//collections::VecDeque,
 	marker::PhantomData,
 	str::FromStr,
 	time::{Duration, Instant},
 };
 
 use codec::{Decode, Encode};
-use log::{error, info, trace, warn};
+//use log::{error, info, trace, warn};
 
 use sc_network::{config::Roles, PeerId};
-use sc_network_gossip::{GossipEngine, MessageIntent, ValidationResult, ValidatorContext};
+use sc_network_gossip::{ MessageIntent, ValidationResult, ValidatorContext};//GossipEngine
 use sp_runtime::traits::Block as BlockT;
 
 use super::{
@@ -218,7 +218,7 @@ impl<Block: BlockT> sc_network_gossip::Validator<Block> for GossipValidator<Bloc
 	fn validate(
 		&self,
 		_context: &mut dyn ValidatorContext<Block>,
-		who: &PeerId,
+		_who: &PeerId,
 		mut data: &[u8],
 	) -> ValidationResult<Block::Hash> {
 		let gossip_msg = GossipMessage::decode(&mut data);
@@ -286,7 +286,7 @@ impl<Block: BlockT> sc_network_gossip::Validator<Block> for GossipValidator<Bloc
 	}
 
 	fn message_expired<'a>(&'a self) -> Box<dyn FnMut(Block::Hash, &[u8]) -> bool + 'a> {
-		Box::new(move |topic, mut data| {
+		Box::new(move |_topic, mut data| {
 			let inner = self.inner.read();
 			let is_complete = inner.is_local_complete();
 			let is_canceled = inner.is_local_canceled();

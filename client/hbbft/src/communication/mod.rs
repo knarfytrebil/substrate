@@ -4,17 +4,18 @@ use badger::sender_queue::{Message as BMessage, SenderQueue};
 use badger::sync_key_gen::{Ack, AckOutcome, Part, PartOutcome, PubKeyMap, SyncKeyGen};//AckFault
 use keystore::KeyStorePtr;
 use runtime_primitives::generic::BlockId;
-use sc_api::{Backend,AuxStore};
+use sc_api::{AuxStore};
 //use runtime_primitives::app_crypto::RuntimeAppPublic;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 //use std::convert::TryInto;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
+//use consensus_common::{self, BlockImportParams, BlockOrigin, ForkChoiceStrategy, SelectChain, Error as ConsensusError,};
 use gossip::BadgerSyncGossip;
 use gossip::BadgerJustification;
 use runtime_primitives::Justification;
-use consensus_common::{self, BlockImportParams, BlockOrigin, ForkChoiceStrategy, SelectChain, Error as ConsensusError,};
+use consensus_common::{self, BlockImportParams, BlockOrigin, ForkChoiceStrategy, };
 use runtime_primitives::{
 	generic::{self,DigestItem ,OpaqueDigestItemId},
 };
@@ -24,16 +25,11 @@ use badger_primitives::BadgerPreRuntime;
 use runtime_primitives::traits::{NumberFor,One};
 use consensus_common::evaluation;
 use sc_network_ranting::{ Network as RantingNetwork};
-use client::{
-	 Client, well_known_cache_keys //
-};
+
 use sc_network_ranting::ValidationResult;
 use badger_primitives::ConsensusLog;
 use gossip::BadgerSyncData;
 use gossip::{BadgerFullJustification,BadgerAuthCommit};
-use substrate_primitives::{Blake2Hasher,};
-use hash_db::Hasher;
-use badger_primitives::AuthoritySignature;
 //use badger::dynamic_honey_badger::KeyGenMessage::Ack;
 use crate::aux_store::BadgerPersistentData;
 use badger::crypto::{PublicKey, PublicKeySet, SecretKey, SecretKeyShare}; //PublicKeyShare, Signature
@@ -46,7 +42,7 @@ use badger::honey_badger::EncryptionSchedule;
 use log::{debug, info, trace, warn,error};
 use parity_codec::{Decode, Encode};
 use parking_lot::RwLock;
-use rand::{rngs::OsRng, Rng};
+use rand::{rngs::OsRng, };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 //
@@ -58,8 +54,8 @@ use network::config::Roles;
 use sc_network_ranting::ValidatorContext;
 use sc_network_ranting::RantingEngine;
 use network::PeerId;
-use network::{ NetworkService,ReputationChange};
-use network::message::generic::{ConsensusMessage, Message};
+use network::{ NetworkService,};
+//use network::message::generic::{Message};
 
 //use runtime_primitives::app_crypto::hbbft_thresh::Public as bPublic;
 use runtime_primitives::traits::{Block as BlockT, Hash as HashT, Header as HeaderT};
@@ -969,7 +965,6 @@ pub struct BadgerSyncState<B:BlockT>
         }
       };
 
-      let topic = badger_topic::<B>();
       let packet = {
         let ses_mes = SessionData {
           ses_id: aset.set_id,
@@ -984,10 +979,14 @@ pub struct BadgerSyncState<B:BlockT>
      // network.register_gossip_message(topic, packet_data);
     }
   }
-  pub fn consume_batch(&mut self, batch:BatchType)
+  pub fn consume_batch(&mut self, obatch:Option<BatchType>)
   {
     {
-      self.mech.queued_batches.push_back(batch);
+      if let Some(batch)=obatch
+      {
+        info!("Pushing Batch with epoch {:?}",batch.epoch());
+       self.mech.queued_batches.push_back(batch);
+      }
       if  self.mech.queued_block.is_some()
       {
         return;
@@ -1029,8 +1028,8 @@ pub struct BadgerSyncState<B:BlockT>
       
       let (header, body) = block.deconstruct();
 
-      let header_num = header.number().clone();
-      let mut parent_hash = header.parent_hash().clone();
+      //let header_num = header.number().clone();
+      //let mut parent_hash = header.parent_hash().clone();
       let id = OpaqueDigestItemId::Consensus(&HBBFT_ENGINE_ID);
 
       /*let filter_log = |log: ConsensusLog<NumberFor<B>>| match log {
@@ -1079,9 +1078,9 @@ pub struct BadgerSyncState<B:BlockT>
 				fork_choice: ForkChoiceStrategy::LongestChain,
 				import_existing:false,
 			};
-			let parent_hash = import_block.post_header().hash();
+			//let parent_hash = import_block.post_header().hash();
 			let pnumber = *import_block.post_header().number();
-			let parent_id = BlockId::<B>::hash(parent_hash);
+			//let parent_id = BlockId::<B>::hash(parent_hash);
 			// go on to next block
 			{
 				let eh = import_block.header.parent_hash().clone();
@@ -1110,6 +1109,7 @@ pub struct BadgerSyncState<B:BlockT>
         }
 			if let Some(batch)=mbatch
 			{
+        info!("Additional batch");
 				return  self.batch_to_block(batch)
 			}
 	     	}
@@ -1168,7 +1168,7 @@ pub fn batch_to_block(&mut self, batch:BatchType ) ->BatchProcResult<B>
      }
      let chain_head = match self.block_maker.best_chain() {
       Ok(x) => x,
-      Err(e) => {
+      Err(_) => {
         //warn!(target: "formation", "Unable to author block, no best block header: {:?}", e);
         return BatchProcResult::Nothing ;
       }
@@ -1230,12 +1230,117 @@ pub fn batch_to_block(&mut self, batch:BatchType ) ->BatchProcResult<B>
       self.cached_origin = Some(pair);
     }
   }
-  pub fn imported_block_number(&mut self,num: NumberFor::<B>)
+  pub fn importing_external_block(&mut self,mut bli:BlockImportParams<B>)
+  {
+
+    let just: BadgerFullJustification<B>= match Decode::decode(&mut &bli.justification.as_mut().unwrap()[..])
+		{
+			Ok(dat) => dat,
+			Err(_) => {
+         info!("Invalid justification for external block");
+        return;
+         }
+    };
+    let number=bli.header.number().clone();
+    let chain_head = match self.block_maker.best_chain() {
+      Ok(x) => x,
+      Err(e) => {
+        warn!(target: "formation", "Unable to author block, no best block header: {:?}", &e);
+        return ;
+      }
+    };
+    let next_block=*chain_head.number()+1.into();  
+    let chash=bli.header.hash().clone();
+    if number!=next_block 
+    {
+      info!("Not next block: our next : {:?}, arrival :{:?}",next_block,number);
+      return;
+    }
+    //if ! self.ve
+    let temp:BadgerSyncData<_>=BadgerSyncData{
+      num:number,
+      justification:just,
+    };
+    if ! self.verify_full_justification(&temp)
+    {
+      info!("Invalid justification verification for external block");
+      return;
+    }
+    let mut ebatch=None;
+    if let Some(ref qblock)=&self.mech.queued_block
+    {
+      if qblock.header().hash()!=bli.header.hash() 
+      {
+        let extr_batch=std::mem::replace(&mut self.mech.pending_batch,None);
+        if extr_batch.is_none()
+        {
+          panic!("Invalid state: block pending but batch unset");
+        }
+        info!("Imported block number {:?}, shifting up... ",&next_block);
+        ebatch=extr_batch;
+        
+      }
+    }
+  if ebatch.is_some()
+  {
+    std::mem::replace(&mut self.mech.queued_block,None);
+  }
+  if bli.body.is_none()
+  {
+    warn!("bodyless BLOCKK!");
+    return;
+  }
+
+    if self.mech.queued_block.is_none()
+    {
+      let blk= B::new(bli.header,bli.body.unwrap());
+      self.mech.queued_block=Some(blk);
+    }
+    
+
+
+        match  self.pre_finalize(&chash, temp.justification)
+        {
+          BatchProcResult::Completed(elogs) =>{self.process_extracted(elogs); info!("Imported Block with completed result");},
+          BatchProcResult::Nothing => {},
+          BatchProcResult::EmitJustification(hash,list,elogs) =>
+           {
+             self.process_extracted(elogs); 
+             self.initiate_block_justification(hash, list);
+             info!("Processed block with new block created");
+           }
+        }
+     
+
+    if let Some(extr_batch)=ebatch
+    {
+
+       match  self.batch_to_block(extr_batch) //TODO: FIX!
+       {
+         BatchProcResult::Completed(elogs) =>{self.process_extracted(elogs); info!("Imported Block with completed result");},
+         BatchProcResult::Nothing => {},
+         BatchProcResult::EmitJustification(hash,list,elogs) =>
+          {
+            self.process_extracted(elogs); 
+            self.initiate_block_justification(hash, list);
+            info!("Processed block with new block created");
+          }
+       }
+      }
+
+
+  }
+  pub fn imported_block_number(&mut self,num: NumberFor::<B>,hash:B::Hash,just:Justification)
   {
     {
       
   
-      
+      /*if !(self.finalizer)(hash,Some(justne.encode()))
+			{
+        warn!("Failed finalization...");
+				return ;
+      }*/
+
       if let Some(ref block)= &self.mech.queued_block
       {
         let cur_num=block.header().number();
@@ -1243,6 +1348,13 @@ pub fn batch_to_block(&mut self, batch:BatchType ) ->BatchProcResult<B>
         {
           //we have imported block that overwrote already finalized one....
            panic!("Refinalizing the block should not happen");
+        }
+        if block.header().hash()==hash
+        {
+          info!("We imported same block... {:?}",&hash);
+          std::mem::replace(&mut self.mech.pending_batch,None);
+          self.consume_batch(None);
+           return;
         }
           //need to shift up one... discard currrent block and rebuild...
         //otherwise, recreate the block and hope for the best...
@@ -1253,6 +1365,17 @@ pub fn batch_to_block(&mut self, batch:BatchType ) ->BatchProcResult<B>
           panic!("Invalid state: block pending but batch unset");
         }
         info!("Imported block number {:?}, shifting up... ",&num);
+       match  self.batch_to_block(extr_batch.unwrap()) //TODO: FIX!
+       {
+         BatchProcResult::Completed(elogs) =>{self.process_extracted(elogs); info!("Imported Block with completed result");},
+         BatchProcResult::Nothing => {},
+         BatchProcResult::EmitJustification(hash,list,elogs) =>
+          {
+            self.process_extracted(elogs); 
+            self.initiate_block_justification(hash, list);
+            info!("Processed block with new block created");
+          }
+       }
       }
     }
         
@@ -1362,7 +1485,7 @@ std::mem::replace(&mut self.output_message_buffer,Vec::new())
   pub fn  flush_state(&mut self)
   {
     self.load_origin();
-   let  sid = self.config.my_peer_id.clone();
+   //let  sid = self.config.my_peer_id.clone();
    let  pair = self.cached_origin.clone().unwrap();
     let mut drain=Vec::new();
       if let BadgerState::Badger(ref mut state) = &mut self.state
@@ -1541,29 +1664,12 @@ std::mem::replace(&mut self.output_message_buffer,Vec::new())
   }
   pub fn proceed_to_sync(&mut self) -> Vec<(LocalTarget<B>, GossipMessage<B>)>
   {
-    let ln = self.persistent.authority_set.inner.read().current_authorities.len();
-    let mut cur;
-    {
-      let iaset = self.persistent.authority_set.inner.read();
-      cur = iaset
-        .current_authorities
-        .iter()
-        .filter(|&n| self.peers.inverse.contains_key(n))
-        .count();
-      if self.is_authority() &&
-        !self
-          .peers
-          .inverse
-          .contains_key(&self.cached_origin.as_ref().unwrap().public())
-      {
-        cur = cur + 1;
-      }
-    }
+   // let ln = self.persistent.authority_set.inner.read().current_authorities.len();
     let info = self.client.info();
     let best_number = info.best_number;
     let b_id=BlockId::Hash(info.best_hash);
     let hd=self.client.justification(&b_id);
-    	/// Get block justification.
+    	// Get block justification.
 	//fn justification(&self, id: &BlockId<Block>) -> Result<Option<Justification>, Error>;
    let cur_just= match hd
     {
@@ -1768,7 +1874,7 @@ pub fn process_sync_message (&mut self, sync:BadgerSyncGossip<B>) ->bool
 {
   let info = self.client.info();
   let our_best=info.best_number;
-let our_hash=info.best_hash;
+//let our_hash=info.best_hash;
   if !sync.verify()
   {
   return self.is_sync_complete(our_best);
@@ -1777,11 +1883,11 @@ let our_hash=info.best_hash;
   let aset = self.persistent.authority_set.inner.read();
     if !aset.current_authorities.contains(&sync.source)
     {
-      /// sync from non-authority, ignoring... 
+      // sync from non-authority, ignoring... 
       return self.is_sync_complete(our_best);
     }
   }
-  let info=self.client.info();
+ // let info=self.client.info().chain;
 
 if sync.data.num<our_best
 {
@@ -2589,9 +2695,9 @@ Block::Hash:Ord,
 BPM:BlockPusherMaker<Block>,
 Aux:AuxStore+Send+Sync+'static
 {
-  pub fn on_block_imported(&self,num:NumberFor::<Block>)
+  pub fn on_block_imported(&self,blki:BlockImportParams<Block>)//num:NumberFor::<Block>,hash:Block::Hash,just:&Justification)
   {
-    self.inner.write().imported_block_number(num);
+    self.inner.write().importing_external_block(blki);  //imported_block_number(num,has,just);
   }
   fn send_message(
     &self, who: &PeerId, vdata: Vec<u8>, context_val: &mut dyn ValidatorContext<Block>,
@@ -2824,7 +2930,7 @@ Aux:AuxStore+Send+Sync+'static
   pub fn process_batch(&self,batch:<QHB as ConsensusProtocol>::Output,net:  &mut dyn ValidatorContext<Block>)
   {
     {
-     self.inner.write().consume_batch(batch);
+     self.inner.write().consume_batch(Some(batch));
     }
     {
       self.flush_message(&mut Vec::new(), net);
@@ -3121,9 +3227,9 @@ B::Hash:Ord,
 Aux:AuxStore+Send+Sync+'static,
 BPM:BlockPusherMaker<B>+'static,
 {
-  pub fn on_block_imported(&self,num:NumberFor::<B>)
+  pub fn on_block_imported(&self,blki:BlockImportParams<B>)//num:NumberFor::<B>,hash:B::Hash,just:Justification)
   {
-  self.node.on_block_imported(num);
+  self.node.on_block_imported(blki);//num,hash);
   }
   /// Create a new NetworkBridge to the given NetworkService. Returns the service
   /// handle and a future that must be polled to completion to finish startup.
@@ -3253,7 +3359,7 @@ BPM:BlockPusherMaker<Block>,
   }
 }
 
-use runtime_primitives::ConsensusEngineId;
+//use runtime_primitives::ConsensusEngineId;
 
 
 

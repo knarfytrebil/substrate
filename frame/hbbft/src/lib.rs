@@ -35,7 +35,7 @@ use codec::{self as codec,  Encode,Decode }; //Decode,Error,Codec,
 use rstd::collections::btree_map::BTreeMap;
 use rstd::prelude::*;
 use session::OnSessionEnding;
-use frame_support::dispatch::DispatchError;
+//use frame_support::dispatch::DispatchError;
 use sp_runtime::{
   generic::{DigestItem, },
   //traits::Zero,
@@ -250,7 +250,7 @@ decl_module! {
 		pub fn vote_to_change(origin, new_auth_ids: Vec<T::AccountId>)
 		{
 			let who=ensure_signed(origin)?;
-			Self::update_vote_set(&who,new_auth_ids,|c_auths,new_ids|
+			let res=Self::update_vote_set(&who,new_auth_ids,|c_auths,new_ids|
 				{
 					if new_ids.len()<4
 					{
@@ -263,7 +263,14 @@ decl_module! {
 					}
 					Ok(())
 				}
-			);	  
+			);
+			match res
+			{
+				Ok(_) =>{},
+				Err(e) =>{
+					return Err(e.into()); 	
+				}
+			}	  
 		}
 
   //fn vote_for_auth

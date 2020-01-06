@@ -141,7 +141,7 @@ macro_rules! new_full_start {
 macro_rules! new_full {
 	($config:expr, $with_startup_data: expr) => {{
 		use futures::sync::mpsc;
-		use network::DhtEvent;
+		//use network::DhtEvent;
     //use futures::Future;
     //let nconf_name = $config.n_conf_file.clone();
     let node_name = $config.name.clone();
@@ -163,18 +163,17 @@ macro_rules! new_full {
 		let participates_in_consensus = is_authority && !$config.sentry_mode;
 
 		let (builder, import_setup, inherent_data_providers) = new_full_start!($config);
-   // let back = builder.backend().clone();
+    let back = builder.backend().clone();
 		
 		// Dht event channel from the network to the authority discovery module. Use bounded channel to ensure
 		// back-pressure. Authority discovery is triggering one event per authority within the current authority set.
 		// This estimates the authority set size to be somewhere below 10 000 thereby setting the channel buffer size to
 		// 10 000.
-		let (dht_event_tx, _dht_event_rx) =
-			mpsc::channel::<DhtEvent>(10_000);
+		//let (dht_event_tx, _dht_event_rx) =
+		//	mpsc::channel::<DhtEvent>(10_000);
       let service = builder
       .with_network_protocol(|_| Ok(crate::service::NodeProtocol::new()))?
       .with_opt_finality_proof_provider(|_client, _| Ok(None))?
-      .with_dht_event_tx(dht_event_tx)?
       .build()?;
 
 		//($with_startup_data)(&block_import, &babe_link);
@@ -217,8 +216,8 @@ macro_rules! new_full {
 		node_key,
 		dev_seed,
 	  )?;    
-	//  let mpc = keygen::run_task(service.client(), back, service.network(), service.keystore(), service.spawn_task_handle())?;
-	 // service.spawn_essential_task(mpc);
+	  let mpc = mpc::run_mpc_task(service.client(), back, service.network(),  service.spawn_task_handle())?;
+	 service.spawn_essential_task(mpc);
      
 			service.spawn_essential_task(badger.map(|_| Ok::<(), ()>(())).compat());
 		}

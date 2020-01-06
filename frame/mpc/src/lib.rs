@@ -3,12 +3,12 @@
 
 use codec::{Decode, Encode};
 
-use app_crypto::RuntimeAppPublic;
+//use app_crypto::RuntimeAppPublic;
 use sp_core::offchain::StorageKind;
 use sp_io::offchain::local_storage_get;
 use sp_runtime::{
 	generic::DigestItem,
-	traits::{IdentifyAccount, Member, One, SimpleArithmetic, StaticLookup, Zero},
+	//traits::{ Member, One, SimpleArithmetic, StaticLookup, Zero}, //IdentifyAccount 
 	RuntimeDebug,
 };
 use sp_std::{collections::btree_set::BTreeSet, prelude::*};
@@ -17,7 +17,7 @@ use support::{
 };
 use system::{
 	ensure_signed,
-	offchain::{CreateTransaction, SubmitSignedTransaction},
+	offchain::{ SubmitSignedTransaction}, //CreateTransaction
 };
 
 pub use sp_mpc::{crypto, get_storage_key, ConsensusLog, MpcRequest, OffchainStorageType, KEY_TYPE, MPC_ENGINE_ID};

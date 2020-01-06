@@ -355,6 +355,7 @@ pub trait Misc {
 
 /// Interfaces for working with crypto related types from within the runtime.
 #[runtime_interface]
+/// Interfaces for working with crypto related types from within the runtime.
 pub trait Crypto {
 	/// Returns all `ed25519` public keys for the given key id from the keystore.
 	fn ed25519_public_keys(&mut self, id: KeyTypeId) -> Vec<ed25519::Public> {

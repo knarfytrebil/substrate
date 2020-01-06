@@ -7,7 +7,7 @@ use curv::{
 		proofs::{sigma_correct_homomorphic_elgamal_enc::HomoELGamalProof, sigma_dlog::DLogProof},
 		secret_sharing::feldman_vss::VerifiableSS,
 	},
-	FE, GE,
+	FE,// GE,
 };
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2018::{
 	mta::{MessageA, MessageB},

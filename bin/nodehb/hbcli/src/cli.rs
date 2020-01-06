@@ -20,8 +20,8 @@ use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 pub use sc_cli::{VersionInfo, IntoExit, NoCustom, SharedParams, };
 use sc_service::{AbstractService, Roles as ServiceRoles, Configuration};
 use log::info;
-use structopt::{StructOpt, StructOptInternal, clap::App};
-use sc_cli::{display_role, parse_and_prepare, ParseAndPrepare};
+use structopt::{StructOpt, };
+use sc_cli::{display_role, parse_and_prepare, GetSharedParams,  ParseAndPrepare}; 
 use crate::{service, ChainSpec, load_spec};
 use crate::factory_impl::FactoryState;
 use transaction_factory::RuntimeAdapter;
@@ -84,12 +84,15 @@ pub struct FactoryCmd {
 	pub import_params: ImportParams,
 }
 
-// impl StructOptInternal for FactoryCmd {
-// 	fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
-// 		FactoryCmd::augment_clap(app)
-// 	}
-// }
 
+
+impl GetSharedParams for CustomSubcommands {
+	fn shared_params(&self) -> Option<&SharedParams> {
+		match self {
+			CustomSubcommands::Factory(cmd) => Some(&cmd.shared_params),
+		}
+	}
+}
 
 
 /// Parse command line arguments into service configuration.

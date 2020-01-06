@@ -1,21 +1,21 @@
 use std::{
 	collections::VecDeque,
-	marker::{PhantomData, Unpin},
+	marker::{ Unpin}, //PhantomData
 	pin::Pin,
-	str::FromStr,
+	//str::FromStr,
 	sync::Arc,
 };
 
-use codec::{Decode, Encode};
+//use codec::{Decode, Encode};
 use futures::prelude::{Future, Sink, Stream};
 use futures::stream::StreamExt;
 use futures::task::{Context, Poll};
 use log::{error, info};
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2018::party_i::{Keys, Parameters};
 
-use sc_client_api::{backend::Backend, BlockchainEvents, CallExecutor};
+use sc_client_api::{backend::Backend,  CallExecutor};//BlockchainEvents
 use sc_network::PeerId;
-use sc_network_gossip::Network;
+//use sc_network_gossip::Network;
 use sp_core::{offchain::OffchainStorage, Blake2Hasher, H256};
 use sp_runtime::traits::Block as BlockT;
 
@@ -59,14 +59,14 @@ where
 			Poll::Ready(r) => {
 				match Pin::new(&mut self.inner).poll_flush(cx) {
 					Poll::Pending => return Poll::Pending,
-					Poll::Ready(r) => {}
+					Poll::Ready(_r) => {}
 				}
 				Poll::Ready(r)
 			}
 			Poll::Pending => {
 				match Pin::new(&mut self.inner).poll_flush(cx) {
 					Poll::Pending => return Poll::Pending,
-					Poll::Ready(r) => {}
+					Poll::Ready(_r) => {}
 				}
 				Poll::Pending
 			}
@@ -181,7 +181,7 @@ where
 		if res.is_err() {
 			println!("{:?} \n {:?} \n {:?}", secret_shares, vsss, res);
 			panic!("ss error of {:?}", key.party_index);
-			return;
+			//return;
 		}
 
 		let (shared_keys, proof) = res.unwrap();
@@ -204,7 +204,7 @@ where
 		let players = self.env.config.players;
 
 		match cpm {
-			ConfirmPeersMessage::Confirming(from_index) => {
+			ConfirmPeersMessage::Confirming(_from_index) => {
 				println!("recv confirming msg");
 				// let sender = sender.clone().unwrap();
 
@@ -399,7 +399,7 @@ where
 		match msg {
 			GossipMessage::ConfirmPeers(cpm, all_peers_hash) => {
 				let validator = self.env.bridge.validator.inner.read();
-				let our_hash = validator.get_peers_hash();
+				let _our_hash = validator.get_peers_hash();
 
 				println!("cpm msg local state {:?}", validator.local_state());
 
